@@ -409,6 +409,7 @@ declare
   v_next integer;
   v_active integer;
   v_pending integer;
+  v_can_act integer;
   v_board jsonb;
   v_deck jsonb;
   v_winners jsonb:='[]'::jsonb;
@@ -501,6 +502,42 @@ begin
     update public.poker_seats set chips=chips+v_share where table_id=p_table_id and player_id=(v_winners->>0)::uuid;
     update public.poker_hand_state set phase='showdown',acting_seat=null,updated_at=now() where table_id=p_table_id;
     return jsonb_build_object('phase','showdown','winners',v_winners,'pot_awarded',v_share);
+  end if;
+
+  select count(*) into v_can_act
+  from public.poker_seats s
+  where s.table_id=p_table_id and s.chips>0
+    and not (v_folded @> jsonb_build_array(s.seat_number));
+
+  if v_can_act=0 then
+    select cards into v_deck from public.poker_private_decks
+    where table_id=p_table_id and hand_number=v_state.hand_number;
+    v_board:=v_state.board;
+    while jsonb_array_length(v_board)<5 loop
+      v_n:=jsonb_array_length(v_board)+1;
+      v_board:=v_board||jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-v_n));
+    end loop;
+    v_settlement:=public.poker_settle_side_pots(
+      p_table_id,v_state.hand_number,v_board,v_folded,v_total_contrib
+    );
+    update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now()
+    where table_id=p_table_id;
+    return jsonb_build_object('phase','showdown','board',v_board,'all_in_runout',true)||v_settlement;
+  elsif v_can_act=1 and v_active>1 then
+    -- No further betting is possible when every opponent is all-in: run the board automatically.
+    select cards into v_deck from public.poker_private_decks
+    where table_id=p_table_id and hand_number=v_state.hand_number;
+    v_board:=v_state.board;
+    while jsonb_array_length(v_board)<5 loop
+      v_n:=jsonb_array_length(v_board)+1;
+      v_board:=v_board||jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-v_n));
+    end loop;
+    v_settlement:=public.poker_settle_side_pots(
+      p_table_id,v_state.hand_number,v_board,v_folded,v_total_contrib
+    );
+    update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now()
+    where table_id=p_table_id;
+    return jsonb_build_object('phase','showdown','board',v_board,'all_in_runout',true)||v_settlement;
   end if;
 
   select count(*) into v_pending from public.poker_seats s
