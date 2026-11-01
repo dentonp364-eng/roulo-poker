@@ -144,8 +144,7 @@ export default function Home() {
     <main className="lobby-page">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Roulo Poker home">
-          <span className="brand-wordmark">ROULO</span>
-          <span className="brand-name"><b>POKER</b></span>
+          <img className="roulo-wordmark" src="/roulo-logo.svg" alt="Roulo" /><span className="brand-name"><b>POKER</b></span>
         </a>
         <nav className="main-nav" aria-label="Main navigation">
           <a className="nav-active" href="/">Poker lobby</a>
@@ -242,7 +241,7 @@ export default function Home() {
         <aside className="lobby-aside">
           <div className="roulo-feature">
             <div className="feature-cards"><span>A♠</span><span>A♥</span></div>
-            <div className="feature-chip">R</div>
+            <div className="feature-chip"><img src="/roulo-mark.svg" alt="" /></div>
             <strong>ROULO <b>POKER</b></strong>
             <small>YOUR TABLE. YOUR GAME.</small>
           </div>
