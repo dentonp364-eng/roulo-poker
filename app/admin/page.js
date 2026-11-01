@@ -68,7 +68,7 @@ export default function AdminPage() {
   const activeTables = tables.filter(t => t.status === "waiting").length;
 
   if (checking) return <main className="admin-shell"><p>Checking admin access…</p></main>;
-  if (!user) return <main className="admin-shell"><section className="admin-gate"><span className="admin-kicker">ROULO POKER</span><h1>Admin sign in required</h1><p>Sign in with your approved account, then return here.</p><button onClick={() => router.push("/")}>Go to lobby</button></section></main>;
+  if (!user) return <main className="admin-shell"><section className="admin-gate"><span className="admin-kicker">ROULO POKER</span><h1>Admin sign in required</h1><p>Sign in with your approved Discord account. You will be returned here automatically.</p><button onClick={async () => { const { error } = await supabase.auth.signInWithOAuth({ provider: "discord", options: { redirectTo: window.location.origin + "/admin" } }); if (error) setMessage(error.message); }}>Sign in with Discord</button><p className="admin-footnote">Use the same Discord account that was granted admin access.</p><button className="admin-secondary" onClick={() => router.push("/")}>Back to lobby</button></section></main>;
   if (!authorized) return <main className="admin-shell"><section className="admin-gate"><span className="admin-kicker">RESTRICTED AREA</span><h1>Admin access only</h1><p>This account has not been added to the Roulo Poker admin list.</p><button onClick={() => router.push("/")}>Back to lobby</button></section></main>;
 
   return <main className="admin-shell">
