@@ -40,37 +40,36 @@ export default function PokerTablePage() {
     return () => { supabase.removeChannel(channel); };
   }, [load, tableId]);
 
-  if (loading) return <main className="poker-shell"><p className="table-loading">Loading your table…</p></main>;
+  if (loading) return <main className="poker-shell"><p className="table-loading">Loading table…</p></main>;
   if (error || !table) return <main className="poker-shell"><button className="table-back" onClick={()=>router.push("/")}>← Lobby</button><p>{error || "Table not found."}</p></main>;
 
-  const seated = (seat) => players.find(p => p.seat_number === seat);
+  const seatPlayer = (seat) => players.find(p => p.seat_number === seat);
+  const seats = Array.from({length:table.max_players},(_,i)=>seatPlayer(i+1));
   return <main className="poker-shell">
     <header className="poker-topbar">
       <a href="/" className="poker-brand"><span>ROULO</span><small>POKER</small></a>
-      <div className="table-heading"><span className="table-kicker">TEXAS HOLD’EM</span><h1>{table.name}</h1><p>{table.small_blind}/{table.big_blind} blinds <i/> {players.length}/{table.max_players} players</p></div>
-      <button className="table-back" onClick={()=>router.push("/")}>← <span>Lobby</span></button>
+      <div className="table-heading"><span className="table-kicker">TEXAS HOLD’EM</span><h1>{table.name}</h1><p>{table.small_blind}/{table.big_blind} blinds <i/> {players.length}/{table.max_players} seated</p></div>
+      <button className="table-back" onClick={()=>router.push("/")}>← BACK TO LOBBY</button>
     </header>
-    <section className="felt-wrap">
+    <section className="table-stage">
       <div className="felt-table">
-        <div className="felt-brand">ROULO <span>POKER</span></div>
-        <div className="felt-status"><span className="status-pip"/> TABLE OPEN</div>
-        <div className="community-cards">{["A♠","K♥","Q♦","J♣","10♠"].map((v,i)=><div className={`playing-card ${v.includes("♥")||v.includes("♦")?"red-card":""}`} key={i}><b>{v.slice(0,-1)}</b><span>{v.slice(-1)}</span></div>)}</div>
-        <div className="pot-display"><small>POT</small><strong>0</strong><span>VIRTUAL CHIPS</span></div>
-        <div className="table-note">Waiting for the hand to begin</div>
-        {Array.from({length:table.max_players},(_,i)=>{
-          const player=seated(i+1);
-          return <div className={`player-seat seat-${i+1} ${player?"occupied":""}`} key={i}>
-            <div className="seat-avatar">{player?.profile?.avatar_url?<img src={player.profile.avatar_url} alt="" />:<span>{player?"♠":"+"}</span>}</div>
-            <strong>{player?.profile?.discord_name || "Open seat"}</strong>
-            <small>{player?Number(player.chips).toLocaleString()+" chips":"SEAT "+(i+1)}</small>
-          </div>;
-        })}
+        <div className="felt-watermark">ROULO <b>POKER</b></div>
+        <div className="table-center">
+          <div className="table-kicker">TEXAS HOLD’EM</div>
+          <div className="community-cards">{[0,1,2,3,4].map(n=><div className="card-slot" key={n}></div>)}</div>
+          <div className="pot-display"><small>POT</small><strong>0</strong><span>VIRTUAL CHIPS</span></div>
+          <div className="hand-waiting">Waiting for the next hand</div>
+        </div>
+        {seats.map((player,i)=><div className={`player-seat seat-${i+1} ${player?"occupied":""}`} key={i}>
+          <div className="seat-avatar">{player?.profile?.avatar_url?<img src={player.profile.avatar_url} alt="" />:<span>{player?"♠":"+"}</span>}</div>
+          <div className="seat-copy"><small>SEAT {i+1}</small><strong>{player?.profile?.discord_name || "EMPTY SEAT"}</strong><span>{player?Number(player.chips).toLocaleString()+" chips":"Waiting for player"}</span></div>
+        </div>)}
       </div>
     </section>
-    <section className="table-bottom">
-      <div className="hole-card-panel"><div><span className="table-kicker">YOUR HAND</span><strong>Waiting for players</strong></div><div className="card-back">ROULO</div><div className="card-back">POKER</div></div>
-      <div className="action-panel"><button disabled>FOLD</button><button disabled>CHECK / CALL</button><button disabled>BET / RAISE</button></div>
+    <section className="table-controls">
+      <div className="your-cards"><span className="table-kicker">YOUR HAND</span><div className="card-back"><b>R</b></div><div className="card-back"><b>R</b></div></div>
+      <div className="action-panel"><button disabled>FOLD</button><button className="action-primary" disabled>CHECK / CALL</button><button disabled>BET / RAISE</button></div>
     </section>
-    <p className="prototype-note">Seat presence updates live · Poker betting engine is still in development · Virtual chips only</p>
+    <p className="prototype-note">Live seating enabled · Betting and hand progression are still in development · Virtual chips only</p>
   </main>;
 }
