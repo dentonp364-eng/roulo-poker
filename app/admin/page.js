@@ -11,6 +11,8 @@ export default function AdminPage() {
   const [checking, setChecking] = useState(true);
   const [tables, setTables] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [playerStats, setPlayerStats] = useState([]);
+  const [recentHands, setRecentHands] = useState([]);
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
@@ -18,6 +20,16 @@ export default function AdminPage() {
   const loadAdmins = useCallback(async () => {
     const { data, error } = await supabase.rpc("admin_list_users");
     if (error) setMessage(error.message); else setPlayers(Array.isArray(data) ? data : []);
+  }, []);
+
+  const loadPlayerStats = useCallback(async () => {
+    const { data, error } = await supabase.rpc("admin_list_player_stats");
+    if (error) setMessage(error.message); else setPlayerStats(Array.isArray(data) ? data : []);
+  }, []);
+
+  const loadRecentHands = useCallback(async () => {
+    const { data, error } = await supabase.rpc("admin_list_recent_hands", { p_limit: 30 });
+    if (error) setMessage(error.message); else setRecentHands(Array.isArray(data) ? data : []);
   }, []);
 
   const loadTables = useCallback(async () => {
@@ -38,12 +50,12 @@ export default function AdminPage() {
       if (error) setMessage(error.message);
       const allowed = data === true;
       setAuthorized(allowed);
-      if (allowed) { await loadTables(); await loadAdmins(); }
+      if (allowed) { await loadTables(); await loadAdmins(); await loadPlayerStats(); await loadRecentHands(); }
       setChecking(false);
     }
     checkAccess();
     return () => { alive = false; };
-  }, [loadTables, loadAdmins]);
+  }, [loadTables, loadAdmins, loadPlayerStats, loadRecentHands]);
 
   async function runAction(key, rpc, args, success) {
     if (busy) return;
@@ -51,7 +63,7 @@ export default function AdminPage() {
     const { error } = await supabase.rpc(rpc, args);
     setBusy("");
     if (error) setMessage(error.message);
-    else { setMessage(success); await loadTables(); await loadAdmins(); }
+    else { setMessage(success); await loadTables(); await loadAdmins(); await loadPlayerStats(); await loadRecentHands(); }
   }
 
   async function assignAdmin(event) {
@@ -90,6 +102,21 @@ export default function AdminPage() {
         {players.length === 0 && <tr><td colSpan="4">No registered player accounts found.</td></tr>}
       </tbody></table></div>
       <p className="admin-footnote">The first administrator must be added once in Supabase SQL Editor. You cannot revoke your own role from this screen.</p>
+    </section>
+    <section className="admin-panel admin-analytics-panel">
+      <div className="admin-section-head"><div><span className="admin-kicker">PLAYER PERFORMANCE</span><h2>Player statistics</h2><p>Lifetime results recorded from completed hands.</p></div><button className="admin-secondary" disabled={!!busy} onClick={async () => { await loadPlayerStats(); await loadRecentHands(); }}>↻ Refresh stats</button></div>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>PLAYER</th><th>HANDS</th><th>WON</th><th>WIN RATE</th><th>CHIPS WON</th><th>NET</th><th>BIGGEST POT</th></tr></thead><tbody>
+        {playerStats.map(p => <tr key={p.id}><td><a className="admin-player-link" href={"/profile/" + p.id}>{p.display_name}</a></td><td>{Number(p.hands_played || 0)}</td><td>{Number(p.hands_won || 0)}</td><td>{Number(p.win_rate || 0).toFixed(1)}%</td><td>{Number(p.total_chips_won || 0).toLocaleString()}</td><td className={Number(p.net_chips || 0) >= 0 ? "result-positive" : "result-negative"}>{Number(p.net_chips || 0).toLocaleString()}</td><td>{Number(p.biggest_pot || 0).toLocaleString()}</td></tr>)}
+        {playerStats.length === 0 && <tr><td colSpan="7">No completed hand statistics have been recorded yet.</td></tr>}
+      </tbody></table></div>
+    </section>
+    <section className="admin-panel admin-analytics-panel">
+      <div className="admin-section-head"><div><span className="admin-kicker">GAME AUDIT</span><h2>Recent completed hands</h2><p>Review table results and winning players.</p></div></div>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>TABLE</th><th>HAND</th><th>POT</th><th>BOARD</th><th>RESULT</th><th>COMPLETED</th></tr></thead><tbody>
+        {recentHands.map(h => <tr key={h.id}><td>{h.table_name}</td><td>#{h.hand_number}</td><td>{Number(h.pot || 0).toLocaleString()}</td><td>{(h.board || []).join(" ") || "Fold-out"}</td><td>{(h.players || []).filter(p => p.is_winner).map(p => p.name).join(", ") || "—"}</td><td>{new Date(h.completed_at).toLocaleString()}</td></tr>)}
+        {recentHands.length === 0 && <tr><td colSpan="6">No completed hands recorded yet.</td></tr>}
+      </tbody></table></div>
+      <p className="admin-footnote">History is archived when a hand reaches showdown. Only completed hands after the history SQL is installed will appear.</p>
     </section>
     <section className="admin-panel">
       <div className="admin-section-head"><div><span className="admin-kicker">ROOM MANAGEMENT</span><h2>Table management</h2><p>Close games, remove players or permanently delete unwanted tables.</p></div><button className="admin-secondary" disabled={!!busy} onClick={loadTables}>↻ Refresh</button></div>
