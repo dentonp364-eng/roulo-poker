@@ -200,7 +200,13 @@ begin
   end if;
 
   if v_category=0 then
-    for v_i in reverse 14..2 loop if v_ranks[v_i]=4 then v_category:=7; v_kickers[1]:=v_i; exit; end if; end loop;
+    for v_i in reverse 14..2 loop
+      if v_ranks[v_i]=4 then
+        v_category:=7; v_kickers[1]:=v_i;
+        for v_j in reverse 14..2 loop if v_ranks[v_j]=1 then v_kickers[2]:=v_j;exit;end if;end loop;
+        exit;
+      end if;
+    end loop;
   end if;
   if v_category=0 then
     for v_i in reverse 14..2 loop
