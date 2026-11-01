@@ -197,9 +197,22 @@ begin
     on conflict (hand_history_id, user_id) do nothing;
   end loop;
 
+  -- A player is a winner if they actually received chips, including a side-pot payout.
+  update public.poker_hand_history_players
+  set is_winner = chips_won > 0
+  where hand_history_id = v_history_id;
+
+  update public.poker_hand_history
+  set winner_ids = coalesce((
+    select array_agg(hp.user_id order by hp.seat_number)
+    from public.poker_hand_history_players hp
+    where hp.hand_history_id = v_history_id and hp.chips_won > 0
+  ), array[]::uuid[])
+  where id = v_history_id;
+
   return new;
 end;
-$$;
+$;
 
 drop trigger if exists poker_archive_completed_hand on public.poker_hand_state;
 create trigger poker_archive_completed_hand
@@ -408,3 +421,35 @@ revoke all on function public.admin_list_player_stats() from public;
 revoke all on function public.admin_list_recent_hands(integer) from public;
 grant execute on function public.admin_list_player_stats() to authenticated;
 grant execute on function public.admin_list_recent_hands(integer) to authenticated;
+
+
+-- Ensure the hand state persists the final folded seats before the archive trigger runs.
+-- The existing poker action RPC returned early in fold-out/all-in branches before its
+-- common state update. Patch those exact update statements without changing its API.
+do $$
+declare
+  v_definition text;
+  v_original text;
+begin
+  v_definition := pg_get_functiondef('public.poker_player_action(uuid,text,bigint)'::regprocedure);
+  v_original := v_definition;
+
+  v_definition := replace(
+    v_definition,
+    'set phase=''showdown'',acting_seat=null,updated_at=now() where table_id=p_table_id;',
+    'set phase=''showdown'',acting_seat=null,folded_seats=v_folded,total_contributions=v_total_contrib,contributions=v_contrib,updated_at=now() where table_id=p_table_id;'
+  );
+
+  v_definition := replace(
+    v_definition,
+    'set phase=''showdown'',board=v_board,acting_seat=null,updated_at=now()',
+    'set phase=''showdown'',board=v_board,acting_seat=null,folded_seats=v_folded,total_contributions=v_total_contrib,contributions=v_contrib,updated_at=now()'
+  );
+
+  if v_definition = v_original then
+    raise exception 'Could not locate poker_player_action showdown updates; no function changes were applied';
+  end if;
+
+  execute v_definition;
+end;
+$$;
