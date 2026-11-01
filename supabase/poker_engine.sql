@@ -81,6 +81,7 @@ begin
   if v_user is null then raise exception 'Sign in first'; end if;
   select * into v_table from public.poker_tables where id = p_table_id for update;
   if not found then raise exception 'Table not found'; end if;
+  if v_table.status <> 'waiting' then raise exception 'This table is closed'; end if;
   if not exists (select 1 from public.poker_seats where table_id=p_table_id and player_id=v_user) then
     raise exception 'You must be seated at this table';
   end if;
@@ -94,6 +95,9 @@ begin
 
   insert into public.poker_hand_state(table_id) values(p_table_id)
   on conflict(table_id) do nothing;
+  if exists (select 1 from public.poker_hand_state where table_id=p_table_id and phase not in ('waiting','showdown')) then
+    raise exception 'A hand is already in progress';
+  end if;
   select hand_number + 1, coalesce(dealer_seat,0) into v_hand,v_dealer
   from public.poker_hand_state where table_id=p_table_id for update;
   v_dealer := coalesce((select min(seat_number) from public.poker_seats where table_id=p_table_id and seat_number>v_dealer and chips>0),
@@ -149,3 +153,279 @@ $$;
 
 revoke all on function public.start_poker_hand(uuid) from public;
 grant execute on function public.start_poker_hand(uuid) to authenticated;
+
+
+-- Evaluate a five-card poker hand. Higher numeric scores always win.
+create or replace function public.poker_score_five(p_cards jsonb)
+returns bigint
+language plpgsql immutable
+set search_path = ''
+as $$
+declare
+  v_ranks integer[] := array_fill(0, array[15]);
+  v_values integer[] := array[]::integer[];
+  v_suits text[] := array[]::text[];
+  v_card text;
+  v_rank integer;
+  v_suit text;
+  v_flush boolean;
+  v_straight integer := 0;
+  v_category integer := 0;
+  v_kickers integer[] := array[0,0,0,0,0];
+  v_i integer;
+  v_j integer;
+  v_n integer := 0;
+  v_score bigint;
+begin
+  if jsonb_array_length(p_cards) <> 5 then raise exception 'Five cards required'; end if;
+  for v_card in select jsonb_array_elements_text(p_cards) loop
+    v_suit := right(v_card,1);
+    v_rank := case left(v_card,length(v_card)-1)
+      when 'A' then 14 when 'K' then 13 when 'Q' then 12 when 'J' then 11
+      else left(v_card,length(v_card)-1)::integer end;
+    v_ranks[v_rank] := v_ranks[v_rank] + 1;
+    v_values := array_append(v_values,v_rank);
+    v_suits := array_append(v_suits,v_suit);
+  end loop;
+  v_flush := v_suits[1]=v_suits[2] and v_suits[2]=v_suits[3] and v_suits[3]=v_suits[4] and v_suits[4]=v_suits[5];
+  for v_i in reverse 14..5 loop
+    if v_ranks[v_i]>0 and v_ranks[v_i-1]>0 and v_ranks[v_i-2]>0 and v_ranks[v_i-3]>0 and v_ranks[v_i-4]>0 then
+      v_straight := v_i; exit;
+    end if;
+  end loop;
+  if v_straight=0 and v_ranks[14]>0 and v_ranks[2]>0 and v_ranks[3]>0 and v_ranks[4]>0 and v_ranks[5]>0 then v_straight:=5; end if;
+
+  if v_flush and v_straight>0 then
+    v_category:=8; v_kickers[1]:=v_straight;
+  elsif v_ranks[2:14] @> array[4]::integer[] then
+    null;
+  end if;
+
+  if v_category=0 then
+    for v_i in reverse 14..2 loop if v_ranks[v_i]=4 then v_category:=7; v_kickers[1]:=v_i; exit; end if; end loop;
+  end if;
+  if v_category=0 then
+    for v_i in reverse 14..2 loop
+      if v_ranks[v_i]=3 then
+        for v_j in reverse 14..2 loop if v_j<>v_i and v_ranks[v_j]>=2 then v_category:=6;v_kickers[1]:=v_i;v_kickers[2]:=v_j;exit;end if;end loop;
+      end if;
+      exit when v_category=6;
+    end loop;
+  end if;
+  if v_category=0 and v_flush then
+    v_category:=5;
+    select array_agg(x order by x desc) into v_kickers from unnest(v_values) x;
+  end if;
+  if v_category=0 and v_straight>0 then v_category:=4;v_kickers[1]:=v_straight; end if;
+  if v_category=0 then
+    for v_i in reverse 14..2 loop if v_ranks[v_i]=3 then v_category:=3;v_kickers[1]:=v_i;exit;end if;end loop;
+  end if;
+  if v_category=0 then
+    for v_i in reverse 14..2 loop
+      if v_ranks[v_i]=2 then
+        if v_kickers[1]=0 then v_kickers[1]:=v_i;
+        elsif v_kickers[2]=0 then v_kickers[2]:=v_i; end if;
+      end if;
+    end loop;
+    if v_kickers[2]>0 then
+      v_category:=2;
+      for v_i in reverse 14..2 loop if v_ranks[v_i]=1 then v_kickers[3]:=v_i;exit;end if;end loop;
+    elsif v_kickers[1]>0 then
+      v_category:=1;
+      for v_i in reverse 14..2 loop if v_ranks[v_i]=1 then v_kickers[2]:=v_i;exit;end if;end loop;
+      for v_i in reverse 14..2 loop if v_ranks[v_i]=1 and v_i<>v_kickers[2] then v_kickers[3]:=v_i;exit;end if;end loop;
+      for v_i in reverse 14..2 loop if v_ranks[v_i]=1 and v_i<>v_kickers[2] and v_i<>v_kickers[3] then v_kickers[4]:=v_i;exit;end if;end loop;
+    end if;
+  end if;
+  if v_category=0 then
+    v_category:=0;
+    select array_agg(x order by x desc) into v_kickers from unnest(v_values) x;
+  end if;
+  v_score:=v_category;
+  for v_i in 1..5 loop v_score:=v_score*15+coalesce(v_kickers[v_i],0); end loop;
+  return v_score;
+end;
+$$;
+
+-- Best five-card score from seven cards.
+create or replace function public.poker_score_seven(p_cards jsonb)
+returns bigint
+language plpgsql immutable
+set search_path = ''
+as $$
+declare
+  v_best bigint := -1;
+  v_score bigint;
+  a integer; b integer; c integer; d integer; e integer;
+  v_five jsonb;
+begin
+  if jsonb_array_length(p_cards)<>7 then raise exception 'Seven cards required'; end if;
+  for a in 0..2 loop for b in a+1..3 loop for c in b+1..4 loop
+    for d in c+1..5 loop for e in d+1..6 loop
+      v_five:=jsonb_build_array(p_cards->a,p_cards->b,p_cards->c,p_cards->d,p_cards->e);
+      v_score:=public.poker_score_five(v_five);
+      if v_score>v_best then v_best:=v_score; end if;
+    end loop; end loop;
+  end loop; end loop; end loop;
+  return v_best;
+end;
+$$;
+
+-- Apply a turn action, advance streets automatically, and settle the pot at showdown.
+create or replace function public.poker_player_action(
+  p_table_id uuid,
+  p_action text,
+  p_amount bigint default 0
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid:=auth.uid();
+  v_state public.poker_hand_state%rowtype;
+  v_table public.poker_tables%rowtype;
+  v_seat public.poker_seats%rowtype;
+  v_target bigint;
+  v_to_call bigint;
+  v_paid bigint;
+  v_next integer;
+  v_active integer;
+  v_pending integer;
+  v_board jsonb;
+  v_deck jsonb;
+  v_winners jsonb:='[]'::jsonb;
+  v_best bigint:=-1;
+  v_score bigint;
+  v_player record;
+  v_cards jsonb;
+  v_share bigint;
+  v_remainder bigint;
+  v_new_phase text;
+  v_street_bet bigint;
+  v_contrib jsonb;
+  v_folded jsonb;
+  v_acted jsonb;
+begin
+  if v_user is null then raise exception 'Sign in first'; end if;
+  select * into v_table from public.poker_tables where id=p_table_id for update;
+  if not found or v_table.status<>'waiting' then raise exception 'Table unavailable'; end if;
+  select * into v_state from public.poker_hand_state where table_id=p_table_id for update;
+  if not found or v_state.phase not in ('preflop','flop','turn','river') then raise exception 'No active hand'; end if;
+  select * into v_seat from public.poker_seats where table_id=p_table_id and player_id=v_user for update;
+  if not found then raise exception 'You are not seated at this table'; end if;
+  if v_state.acting_seat is distinct from v_seat.seat_number then raise exception 'It is not your turn'; end if;
+  if v_seat.chips<0 then raise exception 'Invalid chip balance'; end if;
+
+  v_contrib:=v_state.contributions;
+  v_folded:=v_state.folded_seats;
+  v_acted:=v_state.acted_seats;
+  v_to_call:=greatest(0,v_state.current_bet-coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0));
+
+  if p_action='fold' then
+    v_folded:=v_folded||jsonb_build_array(v_seat.seat_number);
+    v_acted:=v_acted||jsonb_build_array(v_seat.seat_number);
+  elsif p_action='check' then
+    if v_to_call>0 then raise exception 'You must call or fold'; end if;
+    v_acted:=v_acted||jsonb_build_array(v_seat.seat_number);
+  elsif p_action='call' then
+    if v_to_call=0 then raise exception 'Nothing to call'; end if;
+    v_paid:=least(v_seat.chips,v_to_call);
+    update public.poker_seats set chips=chips-v_paid where id=v_seat.id;
+    v_contrib:=jsonb_set(v_contrib,array[v_seat.seat_number::text],to_jsonb(coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0)+v_paid),true);
+    update public.poker_hand_state set pot=pot+v_paid where table_id=p_table_id;
+    v_acted:=v_acted||jsonb_build_array(v_seat.seat_number);
+  elsif p_action in ('bet','raise') then
+    if p_amount<=v_state.current_bet then raise exception 'Bet/raise must exceed the current bet'; end if;
+    if p_amount>v_seat.chips+coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0) then raise exception 'Bet exceeds your available chips'; end if;
+    if v_state.current_bet>0 and p_action='bet' then raise exception 'Use raise while a bet is outstanding'; end if;
+    if v_state.current_bet=0 and p_action='raise' then raise exception 'Use bet when no bet is outstanding'; end if;
+    v_target:=p_amount-coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0);
+    if v_target>v_seat.chips then raise exception 'Insufficient chips'; end if;
+    update public.poker_seats set chips=chips-v_target where id=v_seat.id;
+    v_contrib:=jsonb_set(v_contrib,array[v_seat.seat_number::text],to_jsonb(p_amount),true);
+    update public.poker_hand_state set pot=pot+v_target,current_bet=p_amount where table_id=p_table_id;
+    v_acted:=jsonb_build_array(v_seat.seat_number);
+  else
+    raise exception 'Unknown action';
+  end if;
+
+  select count(*) into v_active from public.poker_seats s
+  where s.table_id=p_table_id and not (v_folded @> jsonb_build_array(s.seat_number));
+  if v_active=1 then
+    select jsonb_agg(s.player_id) into v_winners from public.poker_seats s
+    where s.table_id=p_table_id and not (v_folded @> jsonb_build_array(s.seat_number));
+    select (select pot from public.poker_hand_state where table_id=p_table_id) into v_share;
+    update public.poker_seats set chips=chips+v_share where table_id=p_table_id and player_id=(v_winners->>0)::uuid;
+    update public.poker_hand_state set phase='showdown',acting_seat=null,updated_at=now() where table_id=p_table_id;
+    return jsonb_build_object('phase','showdown','winners',v_winners,'pot_awarded',v_share);
+  end if;
+
+  select count(*) into v_pending from public.poker_seats s
+  where s.table_id=p_table_id and s.chips>0
+    and not (v_folded @> jsonb_build_array(s.seat_number))
+    and not (v_acted @> jsonb_build_array(s.seat_number));
+  if v_pending=0 then
+    -- All live players have acted and matched the current wager: deal next street.
+    select cards into v_deck from public.poker_private_decks where table_id=p_table_id and hand_number=v_state.hand_number;
+    v_board:=v_state.board;
+    if v_state.phase='preflop' then
+      v_board:=jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-1),v_deck->(jsonb_array_length(v_deck)-2),v_deck->(jsonb_array_length(v_deck)-3));
+      v_new_phase:='flop';
+    elsif v_state.phase='flop' then
+      v_board:=v_board||jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-4));
+      v_new_phase:='turn';
+    elsif v_state.phase='turn' then
+      v_board:=v_board||jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-5));
+      v_new_phase:='river';
+    else
+      v_new_phase:='showdown';
+    end if;
+
+    if v_new_phase='showdown' then
+      for v_player in
+        select s.player_id,s.seat_number from public.poker_seats s
+        where s.table_id=p_table_id and not (v_folded @> jsonb_build_array(s.seat_number))
+      loop
+        select h.cards||v_board into v_cards from public.poker_hole_cards h
+        where h.table_id=p_table_id and h.hand_number=v_state.hand_number and h.player_id=v_player.player_id;
+        v_score:=public.poker_score_seven(v_cards);
+        if v_score>v_best then v_best:=v_score;v_winners:=jsonb_build_array(v_player.player_id);
+        elsif v_score=v_best then v_winners:=v_winners||jsonb_build_array(v_player.player_id);end if;
+      end loop;
+      select pot into v_share from public.poker_hand_state where table_id=p_table_id;
+      v_remainder:=v_share % jsonb_array_length(v_winners);
+      v_share:=v_share / jsonb_array_length(v_winners);
+      update public.poker_seats s set chips=chips+v_share+
+        case when row_number() over (order by s.seat_number)<=v_remainder then 1 else 0 end
+      where s.table_id=p_table_id and s.player_id in (select value::uuid from jsonb_array_elements_text(v_winners));
+      update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now() where table_id=p_table_id;
+      return jsonb_build_object('phase','showdown','winners',v_winners,'pot_awarded',v_share*jsonb_array_length(v_winners)+v_remainder,'board',v_board);
+    end if;
+
+    v_street_bet:=0;
+    v_acted:='[]'::jsonb;
+    update public.poker_hand_state set phase=v_new_phase,board=v_board,current_bet=0,
+      contributions='{}'::jsonb,acted_seats='[]'::jsonb,updated_at=now() where table_id=p_table_id;
+  end if;
+
+  select min(s.seat_number) into v_next from public.poker_seats s
+  where s.table_id=p_table_id and s.chips>0
+    and not (v_folded @> jsonb_build_array(s.seat_number))
+    and s.seat_number>v_seat.seat_number;
+  if v_next is null then
+    select min(s.seat_number) into v_next from public.poker_seats s
+    where s.table_id=p_table_id and s.chips>0
+      and not (v_folded @> jsonb_build_array(s.seat_number));
+  end if;
+  update public.poker_hand_state set acting_seat=v_next,contributions=v_contrib,
+    folded_seats=v_folded,acted_seats=v_acted,updated_at=now() where table_id=p_table_id;
+  return jsonb_build_object('ok',true,'next_seat',v_next,'phase',coalesce(v_new_phase,v_state.phase));
+end;
+$$;
+
+revoke all on function public.poker_player_action(uuid,text,bigint) from public;
+grant execute on function public.poker_player_action(uuid,text,bigint) to authenticated;
+revoke all on function public.poker_score_five(jsonb) from public;
+revoke all on function public.poker_score_seven(jsonb) from public;
