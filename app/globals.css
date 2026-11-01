@@ -168,3 +168,25 @@ a { color: inherit; text-decoration: none; }
 @media(max-width:1120px){.lobby-grid{grid-template-columns:minmax(250px,.8fr) minmax(0,1.5fr)}.lobby-aside{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr}.roulo-feature{min-height:190px}}
 @media(max-width:850px){.lobby-grid{grid-template-columns:1fr}.lobby-aside{grid-column:auto;grid-template-columns:1fr 1fr}.roulo-feature{min-height:220px}.quick-info{display:none}}
 @media(max-width:520px){.lobby-aside{grid-template-columns:1fr}.roulo-feature{min-height:200px}}
+
+
+/* Roulo Poker admin control room */
+.admin-shell{min-height:100vh;padding:28px max(18px,calc((100vw - 1240px)/2));background:radial-gradient(ellipse at 50% 0%,#243321 0%,#101610 42%,#080b08 82%);color:#f3f6ef}
+.admin-topbar{display:grid;grid-template-columns:1fr 2fr 1fr;align-items:center;gap:18px;padding:10px 0 24px;border-bottom:1px solid #2b3829}
+.admin-brand{font-size:21px;font-weight:950;letter-spacing:2px}.admin-brand b{color:#b7ed54}
+.admin-topbar h1{font-size:25px;margin:4px 0 0;text-align:center}.admin-topbar>div{text-align:center}
+.admin-kicker{font-size:9px;font-weight:900;letter-spacing:2px;color:#b7ed54}
+.admin-secondary,.admin-actions button,.admin-gate button{border:1px solid #465a39;border-radius:8px;padding:10px 14px;background:#192319;color:#e6efdf;font-weight:800;font-size:11px;cursor:pointer}
+.admin-topbar>.admin-secondary{justify-self:end}
+.admin-message{margin:18px 0;padding:12px 15px;border:1px solid #526b39;border-radius:9px;background:#172218;color:#d9edc0;font-size:13px}
+.admin-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+.admin-metrics article{padding:19px;border:1px solid #2d3a2c;border-radius:13px;background:linear-gradient(145deg,#182119,#101510);display:grid;gap:8px}
+.admin-metrics span{font-size:9px;letter-spacing:1.5px;color:#9eae96;font-weight:850}.admin-metrics strong{font-size:29px;color:#c5f37d}
+.admin-panel{padding:23px;border:1px solid #2c382b;border-radius:15px;background:linear-gradient(145deg,#151c16,#0f140f);box-shadow:0 18px 50px #0004}
+.admin-section-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:18px}.admin-section-head h2{font-size:21px;margin:7px 0 5px}.admin-section-head p,.admin-footnote{font-size:11px;color:#9aa794;margin:0}
+.admin-table-wrap{overflow-x:auto}.admin-table{width:100%;border-collapse:collapse;min-width:720px;text-align:left}.admin-table th{padding:12px 10px;background:#202a20;color:#9fad96;font-size:9px;letter-spacing:1.2px}.admin-table td{padding:15px 10px;border-bottom:1px solid #2b352a;font-size:12px}.admin-table td:first-child{display:grid;gap:4px}.admin-table td small{color:#71806c;font-size:9px}
+.admin-status-open,.admin-status-closed{font-size:10px;font-weight:850;text-transform:capitalize}.admin-status-open{color:#b7ed54}.admin-status-closed{color:#e0a06f}
+.admin-actions{display:flex;gap:7px}.admin-actions button{padding:8px 10px}.admin-actions button:disabled,.admin-secondary:disabled{opacity:.5;cursor:not-allowed}.admin-actions .admin-delete{border-color:#703b35;background:#321a18;color:#ffaaa0}
+.admin-empty{padding:40px;text-align:center;color:#99a493;font-size:13px}.admin-footnote{margin:15px 2px 0;line-height:1.6}
+.admin-gate{max-width:480px;margin:15vh auto;padding:35px;border:1px solid #34432f;border-radius:16px;background:#121a13;text-align:center}.admin-gate h1{margin:12px 0}.admin-gate p{color:#a5b19e;font-size:13px;line-height:1.6}.admin-gate button{margin-top:12px}
+@media(max-width:650px){.admin-shell{padding:16px 12px}.admin-topbar{grid-template-columns:1fr auto}.admin-topbar>div{grid-column:1/-1;grid-row:2}.admin-topbar h1{text-align:left}.admin-metrics{gap:7px}.admin-metrics article{padding:12px 9px}.admin-metrics strong{font-size:22px}.admin-metrics span{font-size:8px}.admin-panel{padding:15px}.admin-section-head{align-items:flex-start}.admin-section-head h2{font-size:18px}}
