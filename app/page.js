@@ -1,152 +1,238 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+
+const panel = {
+  background: "#101c15",
+  border: "1px solid #31543a",
+  borderRadius: 18,
+  padding: 20
+};
+
+const button = (background, disabled = false) => ({
+  background,
+  color: "#fff",
+  border: 0,
+  borderRadius: 10,
+  padding: "12px 18px",
+  fontWeight: 800,
+  cursor: disabled ? "not-allowed" : "pointer",
+  opacity: disabled ? 0.55 : 1
+});
 
 export default function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [chips, setChips] = useState(1000);
-  const [bet, setBet] = useState(50);
-  const [message, setMessage] = useState("Welcome to Trashguy Poker!");
+  const [tables, setTables] = useState([]);
+  const [tableName, setTableName] = useState("");
+  const [smallBlind, setSmallBlind] = useState(10);
+  const [bigBlind, setBigBlind] = useState(20);
+  const [maxPlayers, setMaxPlayers] = useState(6);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const loadTables = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("poker_tables")
+      .select("id,name,small_blind,big_blind,max_players,is_private,status,created_at,invite_code,poker_seats(id,player_id,seat_number)")
+      .eq("status", "waiting")
+      .order("created_at", { ascending: false });
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setTables(data || []);
+  }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) setMessage(error.message);
       setUser(data.user);
       setLoading(false);
     });
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => setUser(session?.user ?? null)
-    );
-
-    return () => listener.subscription.unsubscribe();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setTables([]);
+      return;
+    }
+    loadTables();
+    const channel = supabase
+      .channel("trashguy-poker-lobby")
+      .on("postgres_changes", { event: "*", schema: "public", table: "poker_tables" }, loadTables)
+      .on("postgres_changes", { event: "*", schema: "public", table: "poker_seats" }, loadTables)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, loadTables]);
 
   async function signIn() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
-      options: {
-        redirectTo: window.location.origin
-      }
+      options: { redirectTo: window.location.origin }
     });
-
     if (error) setMessage(error.message);
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
-    setMessage("You have signed out.");
+    const { error } = await supabase.auth.signOut();
+    if (error) setMessage(error.message);
+    else setMessage("Signed out.");
   }
 
-  function placeBet() {
-    if (!user) {
-      setMessage("Sign in with Discord before playing.");
+  async function createTable(event) {
+    event.preventDefault();
+    if (!user || busy) return;
+    setBusy(true);
+    setMessage("");
+    const { data, error } = await supabase.rpc("create_poker_table", {
+      p_name: tableName,
+      p_small_blind: Number(smallBlind),
+      p_big_blind: Number(bigBlind),
+      p_max_players: Number(maxPlayers),
+      p_is_private: isPrivate
+    });
+    setBusy(false);
+    if (error) {
+      setMessage(error.message);
       return;
     }
-    if (bet > chips) {
-      setMessage("Not enough chips!");
-      return;
-    }
-    setChips(chips - bet);
-    setMessage(`You bet ${bet} virtual chips!`);
+    setTableName("");
+    setMessage(isPrivate
+      ? `Private table created. Invite code: ${data.invite_code}`
+      : "Table created. You're seated!");
+    await loadTables();
   }
+
+  async function joinTable(table) {
+    if (!user || busy) return;
+    let code = null;
+    if (table.is_private) {
+      code = window.prompt("Enter the private table invite code:");
+      if (!code) return;
+    }
+    setBusy(true);
+    const { error } = await supabase.rpc("join_poker_table", {
+      p_table_id: table.id,
+      p_invite_code: code
+    });
+    setBusy(false);
+    if (error) setMessage(error.message);
+    else setMessage(`You've joined ${table.name}. Poker gameplay is the next build stage.`);
+    await loadTables();
+  }
+
+  const displayName = user?.user_metadata?.full_name ||
+    user?.user_metadata?.name || "Discord player";
 
   return (
     <main style={{
       minHeight: "100vh",
-      background: "#080d0b",
-      color: "white",
+      background: "radial-gradient(ellipse at top, #173b25 0%, #080d0b 55%)",
+      color: "#f4f8f3",
       fontFamily: "Arial, sans-serif",
-      padding: "30px 16px"
+      padding: "28px 16px"
     }}>
-      <header style={{textAlign:"center", marginBottom:30}}>
-        <h1 style={{fontSize:38,fontWeight:900,color:"#7dff69"}}>
-          TRASHGUY POKER
-        </h1>
-        <p style={{color:"#9ca99f"}}>THE HOME OF THE TABLE</p>
+      <header style={{maxWidth:1100, margin:"0 auto 28px", display:"flex",
+        justifyContent:"space-between", alignItems:"center", gap:16, flexWrap:"wrap"}}>
+        <div>
+          <h1 style={{fontSize:34, margin:0, color:"#7dff69", letterSpacing:1}}>TRASHGUY POKER</h1>
+          <p style={{color:"#a8b9aa", margin:"7px 0 0"}}>THE HOME OF THE TABLE</p>
+        </div>
+        <div style={{display:"flex", alignItems:"center", gap:12, flexWrap:"wrap"}}>
+          {loading ? <span>Checking account…</span> : user ? <>
+            <span>Playing as <strong>{displayName}</strong></span>
+            <button onClick={signOut} style={button("#34443a")}>SIGN OUT</button>
+          </> : <button onClick={signIn} style={button("#5865F2")}>SIGN IN WITH DISCORD</button>}
+        </div>
       </header>
 
-      <section style={{
-        maxWidth:850, margin:"auto", textAlign:"center",
-        background:"#101c15", border:"2px solid #355c3b",
-        borderRadius:25, padding:25
-      }}>
-        <h2 style={{color:"#7dff69"}}>PLAYER ACCOUNT</h2>
-
-        {loading ? <p>Checking login...</p> : user ? (
-          <>
-            <p>Signed in as <strong>
-              {user.user_metadata?.full_name ||
-               user.user_metadata?.name || user.email || "Discord player"}
-            </strong></p>
-            <button onClick={signOut} style={button("#444")}>
-              SIGN OUT
-            </button>
-          </>
-        ) : (
-          <>
-            <p>Sign in to join the poker table.</p>
-            <button onClick={signIn} style={button("#5865F2")}>
-              SIGN IN WITH DISCORD
-            </button>
-          </>
-        )}
-
-        <hr style={{borderColor:"#355c3b",margin:"25px 0"}}/>
-
-        <p style={{color:"#7dff69",fontWeight:"bold"}}>
-          TEXAS HOLD'EM · VIRTUAL CHIPS
-        </p>
-
-        <div style={{
-          background:"#12512f", border:"12px solid #392a20",
-          borderRadius:"50%", minHeight:300, display:"flex",
-          flexDirection:"column",alignItems:"center",
-          justifyContent:"center",margin:"25px 0"
-        }}>
-          <h2>TRASHGUY TABLE</h2>
-          <p>COMMUNITY CARDS</p>
-          <div style={{display:"flex",gap:10}}>
-            {["A♠","K♥","7♦","?","?"].map((card,i)=>(
-              <div key={i} style={{
-                background:"white",color:i===1?"#d22":"#111",
-                borderRadius:8,padding:"12px 10px",
-                fontSize:22,fontWeight:"bold"
-              }}>{card}</div>
-            ))}
+      <section style={{maxWidth:1100, margin:"0 auto", ...panel}}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap"}}>
+          <div>
+            <h2 style={{margin:"0 0 6px", color:"#7dff69"}}>POKER LOBBY</h2>
+            <p style={{margin:0, color:"#a8b9aa"}}>Find a table or create your own private game.</p>
           </div>
-          <p>Pot: 150 chips</p>
+          <span style={{color:"#a8b9aa"}}>{tables.length} waiting table{tables.length === 1 ? "" : "s"}</span>
         </div>
 
-        <h3>{user ? "YOUR SEAT" : "GUEST SEAT"}</h3>
-        <p style={{color:"#7dff69"}}>{chips.toLocaleString()} virtual chips</p>
+        {message && <p role="status" style={{background:"#17291d", border:"1px solid #426b49", padding:12, borderRadius:10, overflowWrap:"anywhere"}}>{message}</p>}
 
-        <p>{message}</p>
-        <label>Bet amount: {bet} chips</label>
-        <input type="range" min="10" max="500" step="10"
-          value={bet}
-          onChange={(e)=>setBet(Number(e.target.value))}
-          style={{display:"block",width:"100%",margin:"15px auto"}}
-        />
+        {!user ? <div style={{textAlign:"center", padding:"38px 12px"}}>
+          <h3>Sign in to enter the lobby</h3>
+          <p style={{color:"#a8b9aa"}}>Use your Discord account to create tables and join friends.</p>
+          <button onClick={signIn} style={button("#5865F2")}>SIGN IN WITH DISCORD</button>
+        </div> : <>
+          <form onSubmit={createTable} style={{marginTop:24, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))", gap:12, alignItems:"end"}}>
+            <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
+              Table name
+              <input required maxLength={40} value={tableName} onChange={e=>setTableName(e.target.value)} placeholder="Friday Night Poker" style={field}/>
+            </label>
+            <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
+              Small blind
+              <input type="number" min="1" value={smallBlind} onChange={e=>setSmallBlind(e.target.value)} style={field}/>
+            </label>
+            <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
+              Big blind
+              <input type="number" min="1" value={bigBlind} onChange={e=>setBigBlind(e.target.value)} style={field}/>
+            </label>
+            <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
+              Seats
+              <select value={maxPlayers} onChange={e=>setMaxPlayers(e.target.value)} style={field}>
+                {[2,3,4,5,6,7,8,9].map(n=><option key={n} value={n}>{n} players</option>)}
+              </select>
+            </label>
+            <label style={{display:"flex", alignItems:"center", gap:8, color:"#c9d8ca", padding:"12px 0"}}>
+              <input type="checkbox" checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/> Private table
+            </label>
+            <button type="submit" disabled={busy} style={button("#247d43", busy)}>CREATE TABLE</button>
+          </form>
 
-        <button onClick={placeBet} style={button("#247d43")}>
-          CALL / BET
-        </button>
+          <div style={{marginTop:28}}>
+            <h3 style={{color:"#7dff69"}}>AVAILABLE TABLES</h3>
+            {tables.filter(t=>!t.is_private || t.owner_id === user.id).length === 0
+              ? <p style={{color:"#a8b9aa"}}>No public waiting tables yet. Create one and invite your friends.</p>
+              : <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(245px,1fr))", gap:14}}>
+                {tables.filter(t=>!t.is_private || t.owner_id === user.id).map(table=><article key={table.id} style={{background:"#0b140e", border:"1px solid #31543a", borderRadius:14, padding:16}}>
+                  <div style={{display:"flex", justifyContent:"space-between", gap:8}}>
+                    <strong>{table.name}</strong>
+                    <span style={{color:table.is_private ? "#f4c56a" : "#7dff69", fontSize:12}}>{table.is_private ? "PRIVATE" : "PUBLIC"}</span>
+                  </div>
+                  <p style={{color:"#a8b9aa", margin:"10px 0"}}>{table.small_blind}/{table.big_blind} blinds · {table.max_players} seats</p>
+                  <p style={{color:"#a8b9aa"}}>{table.poker_seats?.length || 0} players seated</p>
+                  {table.is_private && table.invite_code && <p style={{color:"#f4c56a"}}>Invite code: <strong>{table.invite_code}</strong></p>}
+                  <button disabled={busy || (table.poker_seats?.length || 0) >= table.max_players} onClick={()=>joinTable(table)} style={button("#247d43", busy || (table.poker_seats?.length || 0) >= table.max_players)}>
+                    {(table.poker_seats?.length || 0) >= table.max_players ? "TABLE FULL" : "JOIN TABLE"}
+                  </button>
+                </article>)}
+              </div>}
+          </div>
+          <button onClick={loadTables} style={{...button("#34443a"), marginTop:18}}>REFRESH LOBBY</button>
+        </>}
       </section>
-
-      <footer style={{textAlign:"center",color:"#65756a",marginTop:30}}>
-        TRASHGUY POKER · PLAY FOR FUN WITH VIRTUAL CHIPS
-      </footer>
+      <footer style={{textAlign:"center", color:"#718477", marginTop:28}}>TRASHGUY POKER · VIRTUAL PLAY CHIPS ONLY</footer>
     </main>
   );
 }
 
-function button(color) {
-  return {
-    background:color,color:"white",border:0,
-    borderRadius:10,padding:"13px 22px",
-    fontWeight:"bold",cursor:"pointer",margin:8
-  };
-}
+const field = {
+  width: "100%",
+  minWidth: 0,
+  background: "#08110b",
+  color: "#fff",
+  border: "1px solid #426b49",
+  borderRadius: 9,
+  padding: "12px 10px"
+};
