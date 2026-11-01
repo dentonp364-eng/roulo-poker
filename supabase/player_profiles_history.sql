@@ -321,3 +321,90 @@ $$;
 
 revoke all on function public.get_my_poker_hand_history(integer) from public;
 grant execute on function public.get_my_poker_hand_history(integer) to authenticated;
+
+
+-- Admin-only aggregate player performance and recent game history.
+create or replace function public.admin_list_player_stats()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare v_result jsonb;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+  select coalesce(jsonb_agg(x.item order by x.hands_played desc, x.display_name), '[]'::jsonb)
+  into v_result
+  from (
+    select jsonb_build_object(
+      'id', u.id,
+      'display_name', coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker player'),
+      'avatar_url', p.avatar_url,
+      'hands_played', count(hp.id),
+      'hands_won', count(hp.id) filter (where hp.is_winner),
+      'win_rate', case when count(hp.id)=0 then 0 else round(100.0*count(hp.id) filter (where hp.is_winner)/count(hp.id),1) end,
+      'total_chips_won', coalesce(sum(hp.chips_won),0),
+      'net_chips', coalesce(sum(hp.net_result),0),
+      'biggest_pot', coalesce(max(h.pot) filter (where hp.is_winner),0)
+    ) as item,
+    count(hp.id) as hands_played,
+    coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker player') as display_name
+    from auth.users u
+    left join public.player_profiles p on p.id=u.id
+    left join public.poker_hand_history_players hp on hp.user_id=u.id
+    left join public.poker_hand_history h on h.id=hp.hand_history_id
+    where u.deleted_at is null
+    group by u.id,p.discord_name,p.avatar_url,u.raw_user_meta_data
+  ) x;
+  return v_result;
+end;
+$$;
+
+create or replace function public.admin_list_recent_hands(p_limit integer default 50)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare v_result jsonb;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+  select coalesce(jsonb_agg(x.item order by x.completed_at desc), '[]'::jsonb)
+  into v_result
+  from (
+    select jsonb_build_object(
+      'id', h.id,
+      'table_name', h.table_name,
+      'hand_number', h.hand_number,
+      'board', h.board,
+      'pot', h.pot,
+      'winner_ids', h.winner_ids,
+      'completed_at', h.completed_at,
+      'players', (
+        select coalesce(jsonb_agg(jsonb_build_object(
+          'id', hp.user_id,
+          'name', coalesce(nullif(p.discord_name,''),'Poker player'),
+          'is_winner', hp.is_winner,
+          'chips_won', hp.chips_won,
+          'net_result', hp.net_result,
+          'folded', hp.folded
+        ) order by hp.seat_number), '[]'::jsonb)
+        from public.poker_hand_history_players hp
+        left join public.player_profiles p on p.id=hp.user_id
+        where hp.hand_history_id=h.id
+      )
+    ) as item, h.completed_at
+    from public.poker_hand_history h
+    order by h.completed_at desc
+    limit greatest(1,least(coalesce(p_limit,50),100))
+  ) x;
+  return v_result;
+end;
+$$;
+
+revoke all on function public.admin_list_player_stats() from public;
+revoke all on function public.admin_list_recent_hands(integer) from public;
+grant execute on function public.admin_list_player_stats() to authenticated;
+grant execute on function public.admin_list_recent_hands(integer) to authenticated;
