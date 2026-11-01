@@ -1,9 +1,8 @@
-
 import "./globals.css";
 
 export const metadata = {
-  title: "Trashguy Poker",
-  description: "Join the Trashguy Poker tables.",
+  title: "Roulo Poker",
+  description: "Join a private Texas Hold’em table with Roulo Poker.",
 };
 
 export default function RootLayout({ children }) {
