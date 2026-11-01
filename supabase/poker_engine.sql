@@ -291,6 +291,102 @@ begin
 end;
 $$;
 
+-- Settle main and side pots using each player's total contribution for this hand.
+create or replace function public.poker_settle_side_pots(
+  p_table_id uuid,
+  p_hand_number integer,
+  p_board jsonb,
+  p_folded jsonb,
+  p_total_contributions jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_level bigint;
+  v_previous bigint := 0;
+  v_layer bigint;
+  v_contributors integer;
+  v_best bigint;
+  v_score bigint;
+  v_winners uuid[];
+  v_player record;
+  v_cards jsonb;
+  v_share bigint;
+  v_remainder bigint;
+  v_index integer;
+  v_total_awarded bigint := 0;
+  v_layers jsonb := '[]'::jsonb;
+begin
+  for v_level in
+    select distinct value::bigint
+    from jsonb_each_text(p_total_contributions)
+    where value::bigint > 0
+    order by value::bigint
+  loop
+    select count(*) into v_contributors
+    from jsonb_each_text(p_total_contributions) c
+    where c.value::bigint >= v_level;
+    v_layer := (v_level-v_previous) * v_contributors;
+    v_previous := v_level;
+
+    v_best := -1;
+    v_winners := array[]::uuid[];
+    for v_player in
+      select s.player_id, s.seat_number
+      from public.poker_seats s
+      where s.table_id=p_table_id
+        and coalesce((p_total_contributions->>s.seat_number::text)::bigint,0) >= v_level
+        and not (p_folded @> jsonb_build_array(s.seat_number))
+      order by s.seat_number
+    loop
+      select h.cards || p_board into v_cards
+      from public.poker_hole_cards h
+      where h.table_id=p_table_id and h.hand_number=p_hand_number
+        and h.player_id=v_player.player_id;
+      if v_cards is null or jsonb_array_length(v_cards) <> 7 then
+        raise exception 'Missing cards for side-pot eligible player';
+      end if;
+      v_score := public.poker_score_seven(v_cards);
+      if v_score > v_best then
+        v_best := v_score;
+        v_winners := array[v_player.player_id];
+      elsif v_score = v_best then
+        v_winners := array_append(v_winners,v_player.player_id);
+      end if;
+    end loop;
+
+    if coalesce(array_length(v_winners,1),0)=0 then
+      raise exception 'No eligible player for a side pot';
+    end if;
+    v_share := v_layer / array_length(v_winners,1);
+    v_remainder := v_layer % array_length(v_winners,1);
+    v_index := 0;
+    for v_player in
+      select s.player_id
+      from public.poker_seats s
+      where s.table_id=p_table_id and s.player_id=any(v_winners)
+      order by s.seat_number
+    loop
+      v_index := v_index + 1;
+      update public.poker_seats
+      set chips=chips+v_share+case when v_index<=v_remainder then 1 else 0 end
+      where table_id=p_table_id and player_id=v_player.player_id;
+    end loop;
+    v_total_awarded := v_total_awarded + v_layer;
+    v_layers := v_layers || jsonb_build_array(jsonb_build_object(
+      'cap',v_level,'amount',v_layer,'winners',to_jsonb(v_winners)
+    ));
+  end loop;
+
+  return jsonb_build_object('pot_awarded',v_total_awarded,'side_pots',v_layers);
+end;
+$;
+
+revoke all on function public.poker_settle_side_pots(uuid,integer,jsonb,jsonb,jsonb) from public;
+
 -- Apply a turn action, advance streets automatically, and settle the pot at showdown.
 create or replace function public.poker_player_action(
   p_table_id uuid,
@@ -331,6 +427,7 @@ declare
   v_raise_increment bigint;
   v_all_in boolean := false;
   v_total_contrib jsonb;
+  v_settlement jsonb;
 begin
   if v_user is null then raise exception 'Sign in first'; end if;
   select * into v_table from public.poker_tables where id=p_table_id for update;
@@ -431,32 +528,11 @@ begin
     end if;
 
     if v_new_phase='showdown' then
-      for v_player in
-        select s.player_id,s.seat_number from public.poker_seats s
-        where s.table_id=p_table_id and not (v_folded @> jsonb_build_array(s.seat_number))
-      loop
-        select h.cards||v_board into v_cards from public.poker_hole_cards h
-        where h.table_id=p_table_id and h.hand_number=v_state.hand_number and h.player_id=v_player.player_id;
-        v_score:=public.poker_score_seven(v_cards);
-        if v_score>v_best then v_best:=v_score;v_winners:=jsonb_build_array(v_player.player_id);
-        elsif v_score=v_best then v_winners:=v_winners||jsonb_build_array(v_player.player_id);end if;
-      end loop;
-      select pot into v_share from public.poker_hand_state where table_id=p_table_id;
-      v_remainder:=v_share % jsonb_array_length(v_winners);
-      v_share:=v_share / jsonb_array_length(v_winners);
-      v_n := 0;
-      for v_player in
-        select s.player_id from public.poker_seats s
-        where s.table_id=p_table_id and s.player_id in (select value::uuid from jsonb_array_elements_text(v_winners))
-        order by s.seat_number
-      loop
-        v_n := v_n + 1;
-        update public.poker_seats set chips=chips+v_share+
-          case when v_n<=v_remainder then 1 else 0 end
-        where table_id=p_table_id and player_id=v_player.player_id;
-      end loop;
+      v_settlement := public.poker_settle_side_pots(
+        p_table_id,v_state.hand_number,v_board,v_folded,v_total_contrib
+      );
       update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now() where table_id=p_table_id;
-      return jsonb_build_object('phase','showdown','winners',v_winners,'pot_awarded',v_share*jsonb_array_length(v_winners)+v_remainder,'board',v_board);
+      return jsonb_build_object('phase','showdown','board',v_board) || v_settlement;
     end if;
 
     v_street_bet:=0;
