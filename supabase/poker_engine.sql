@@ -13,7 +13,8 @@ create table if not exists public.poker_hand_state (
   contributions jsonb not null default '{}'::jsonb,
   folded_seats jsonb not null default '[]'::jsonb,
   acted_seats jsonb not null default '[]'::jsonb,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  last_raise_size bigint not null default 0
 );
 
 create table if not exists public.poker_private_decks (
@@ -29,6 +30,8 @@ create table if not exists public.poker_hole_cards (
   cards jsonb not null,
   primary key (table_id, hand_number, player_id)
 );
+
+alter table public.poker_hand_state add column if not exists last_raise_size bigint not null default 0;
 
 alter table public.poker_hand_state enable row level security;
 alter table public.poker_hole_cards enable row level security;
@@ -140,12 +143,12 @@ begin
                       (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0));
 
   insert into public.poker_private_decks(table_id,hand_number,cards) values(p_table_id,v_hand,v_deck);
-  insert into public.poker_hand_state(table_id,hand_number,phase,board,pot,current_bet,acting_seat,dealer_seat,contributions,folded_seats,acted_seats,updated_at)
+  insert into public.poker_hand_state(table_id,hand_number,phase,board,pot,current_bet,acting_seat,dealer_seat,contributions,folded_seats,acted_seats,updated_at,last_raise_size)
   values(p_table_id,v_hand,'preflop',v_board,v_pot,v_bb_paid,v_actor,v_dealer,
-    jsonb_build_object(v_sb::text,v_sb_paid,v_bb::text,v_bb_paid),'[]'::jsonb,'[]'::jsonb,now())
+    jsonb_build_object(v_sb::text,v_sb_paid,v_bb::text,v_bb_paid),'[]'::jsonb,'[]'::jsonb,now(),v_table.big_blind)
   on conflict(table_id) do update set hand_number=excluded.hand_number,phase=excluded.phase,board=excluded.board,
     pot=excluded.pot,current_bet=excluded.current_bet,acting_seat=excluded.acting_seat,dealer_seat=excluded.dealer_seat,
-    contributions=excluded.contributions,folded_seats=excluded.folded_seats,acted_seats=excluded.acted_seats,updated_at=now();
+    contributions=excluded.contributions,folded_seats=excluded.folded_seats,acted_seats=excluded.acted_seats,updated_at=now(),last_raise_size=excluded.last_raise_size;
 
   return jsonb_build_object('hand_number',v_hand,'phase','preflop','pot',v_pot,'acting_seat',v_actor);
 end;
@@ -323,6 +326,8 @@ declare
   v_contrib jsonb;
   v_folded jsonb;
   v_acted jsonb;
+  v_raise_increment bigint;
+  v_all_in boolean := false;
 begin
   if v_user is null then raise exception 'Sign in first'; end if;
   select * into v_table from public.poker_tables where id=p_table_id for update;
@@ -355,6 +360,13 @@ begin
   elsif p_action in ('bet','raise') then
     if p_amount<=v_state.current_bet then raise exception 'Bet/raise must exceed the current bet'; end if;
     if p_amount>v_seat.chips+coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0) then raise exception 'Bet exceeds your available chips'; end if;
+    v_all_in := p_amount = v_seat.chips + coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0);
+    v_raise_increment := p_amount-v_state.current_bet;
+    if v_state.current_bet=0 then
+      if not v_all_in and p_amount < v_table.big_blind then raise exception 'Minimum bet is the big blind'; end if;
+    elsif v_raise_increment < greatest(v_state.last_raise_size,v_table.big_blind) and not v_all_in then
+      raise exception 'Minimum raise is %', greatest(v_state.last_raise_size,v_table.big_blind);
+    end if;
     if v_state.current_bet>0 and p_action='bet' then raise exception 'Use raise while a bet is outstanding'; end if;
     if v_state.current_bet=0 and p_action='raise' then raise exception 'Use bet when no bet is outstanding'; end if;
     v_target:=p_amount-coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0);
@@ -362,7 +374,17 @@ begin
     update public.poker_seats set chips=chips-v_target where id=v_seat.id;
     v_contrib:=jsonb_set(v_contrib,array[v_seat.seat_number::text],to_jsonb(p_amount),true);
     update public.poker_hand_state set pot=pot+v_target,current_bet=p_amount where table_id=p_table_id;
-    v_acted:=jsonb_build_array(v_seat.seat_number);
+    if v_all_in and v_raise_increment < greatest(v_state.last_raise_size,v_table.big_blind) then
+      -- A short all-in increases the price but does not reopen action for players who already acted.
+      v_acted:=v_acted||jsonb_build_array(v_seat.seat_number);
+    else
+      v_acted:=jsonb_build_array(v_seat.seat_number);
+    end if;
+    update public.poker_hand_state set last_raise_size=case
+      when v_state.current_bet=0 then p_amount
+      when v_raise_increment >= greatest(v_state.last_raise_size,v_table.big_blind) then v_raise_increment
+      else last_raise_size end
+    where table_id=p_table_id;
   else
     raise exception 'Unknown action';
   end if;
