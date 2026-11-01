@@ -148,3 +148,23 @@ a { color: inherit; text-decoration: none; }
 .prototype-note{text-align:center;color:#83917c;font-size:10px;margin:20px 0 0}
 @media(max-width:800px){.poker-shell{padding:0 12px 25px}.poker-topbar{grid-template-columns:1fr auto;min-height:78px}.table-heading{grid-column:1/-1;grid-row:2;padding:0 0 12px}.poker-brand{font-size:19px}.table-stage{padding:0;margin-top:20px}.felt-table{min-height:530px;border-width:7px;border-radius:220px}.player-seat{min-width:135px;max-width:150px;min-height:61px;padding:7px 8px;gap:7px}.seat-avatar{width:31px;height:31px;flex-basis:31px}.seat-copy strong{font-size:9px}.seat-copy span{font-size:8px}.seat-1{top:-20px;left:calc(50% - 68px)}.seat-4{bottom:-20px;left:calc(50% - 68px)}.seat-2{right:-14px;top:24%}.seat-6{left:-14px;top:24%}.seat-3{right:2%;bottom:12%}.seat-5{left:2%;bottom:12%}.card-slot{width:39px;height:58px}.community-cards{gap:5px;min-height:60px}.table-controls{flex-direction:column;align-items:center}.action-panel{justify-content:center;flex-wrap:wrap}.action-panel button{padding:12px 13px}.table-back{font-size:10px;padding:10px}.table-back span{display:none}}
 @media(max-width:440px){.felt-table{min-height:480px;border-radius:180px}.player-seat{min-width:112px;max-width:120px}.seat-2{right:-7px}.seat-6{left:-7px}.seat-copy span{display:none}.seat-avatar{width:27px;height:27px;flex-basis:27px}.card-slot{width:32px;height:49px}.table-heading h1{font-size:18px}}
+
+
+/* Lobby composition: compact sidebar, central table list and Roulo feature rail */
+.lobby-grid{grid-template-columns:minmax(260px,.78fr) minmax(430px,1.75fr) minmax(210px,.72fr);gap:15px;align-items:stretch}
+.create-panel,.tables-panel{min-height:470px}
+.lobby-aside{display:flex;flex-direction:column;gap:14px}
+.roulo-feature{min-height:260px;position:relative;overflow:hidden;border:1px solid #526b39;border-radius:16px;background:radial-gradient(circle at 50% 35%,#294a27,#101a12 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;box-shadow:inset 0 0 35px #0008}
+.roulo-feature:before,.roulo-feature:after{content:"";position:absolute;width:190px;height:190px;border:1px solid #b7ed5425;border-radius:50%}
+.roulo-feature:after{width:145px;height:145px}
+.feature-cards{display:flex;gap:7px;z-index:1;transform:rotate(-7deg);margin-bottom:-7px}
+.feature-cards span{width:53px;height:72px;background:#f7f7f2;border-radius:7px;color:#152014;display:grid;place-items:center;font-size:22px;font-weight:950;box-shadow:0 6px 15px #0008}
+.feature-cards span:last-child{color:#c43b36;transform:rotate(12deg)}
+.feature-chip{z-index:1;width:88px;height:88px;margin-top:-10px;border:8px dotted #b7ed54;border-radius:50%;background:radial-gradient(circle,#314a28,#0c140d);display:grid;place-items:center;color:#c5f37d;font-size:40px;font-weight:950;font-style:italic;box-shadow:0 0 25px #9bce4b55}
+.roulo-feature>strong{z-index:1;font-size:22px;letter-spacing:1px}.roulo-feature>strong b{color:#b7ed54}.roulo-feature>small{z-index:1;color:#c0d0b4;font-size:9px;letter-spacing:3px}
+.lobby-stats{padding:17px}.lobby-stats .section-heading{margin-bottom:14px}.lobby-stats .section-heading h2{font-size:17px;margin:0}.live-label{color:#b7ed54;font-size:9px;font-weight:900}.live-label i{display:inline-block;width:6px;height:6px;border-radius:50%;background:#b7ed54;margin-right:5px}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;text-align:center}.stats-grid div{display:grid;gap:6px;padding:10px 2px;border-right:1px solid #303b2e}.stats-grid div:last-child{border:0}.stats-grid strong{font-size:20px}.stats-grid span{font-size:8px;color:#a4b19c;line-height:1.3}
+.quick-info h3{font-size:15px;margin:8px 0}.quick-info p{font-size:11px;line-height:1.6;color:#9eaa98;margin:0}
+@media(max-width:1120px){.lobby-grid{grid-template-columns:minmax(250px,.8fr) minmax(0,1.5fr)}.lobby-aside{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr}.roulo-feature{min-height:190px}}
+@media(max-width:850px){.lobby-grid{grid-template-columns:1fr}.lobby-aside{grid-column:auto;grid-template-columns:1fr 1fr}.roulo-feature{min-height:220px}.quick-info{display:none}}
+@media(max-width:520px){.lobby-aside{grid-template-columns:1fr}.roulo-feature{min-height:200px}}
