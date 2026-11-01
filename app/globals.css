@@ -36,7 +36,7 @@ a { color: inherit; text-decoration: none; }
 .button-discord { background: #5865f2; color: white; }
 .button-quiet { background: #1a211b; border-color: #303a31; color: #dce2d9; }
 .button-outline { background: #1b251a; border-color: #506a36; color: var(--accent); }
-.hero-strip { max-width: 1280px; margin: 0 auto; padding: 54px 0 46px; display: flex; align-items: end; justify-content: space-between; }
+.hero-strip { max-width: 1280px; margin: 0 auto; padding: 54px 0 46px; display: flex; align-items: flex-end; justify-content: space-between; }
 .eyebrow { color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: 1.8px; }
 .live-dot { display: inline-block; width: 7px; height: 7px; margin: 0 7px 1px 0; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px #b7ed5470; }
 .hero-strip h1 { margin: 13px 0 8px; font-size: clamp(38px, 5vw, 58px); line-height: 1; letter-spacing: -2.5px; }
