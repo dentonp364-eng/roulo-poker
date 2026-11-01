@@ -3,24 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const panel = {
-  background: "#171025",
-  border: "1px solid #50316f",
-  borderRadius: 18,
-  padding: 20
-};
-
-const button = (background, disabled = false) => ({
-  background,
-  color: "#fff",
-  border: 0,
-  borderRadius: 10,
-  padding: "12px 18px",
-  fontWeight: 800,
-  cursor: disabled ? "not-allowed" : "pointer",
-  opacity: disabled ? 0.55 : 1
-});
-
 export default function Home() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +12,6 @@ export default function Home() {
   const [bigBlind, setBigBlind] = useState(20);
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [isPrivate, setIsPrivate] = useState(false);
-  const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -71,7 +52,7 @@ export default function Home() {
     }
     loadTables();
     const channel = supabase
-      .channel("trashguy-poker-lobby")
+      .channel("roulo-poker-lobby")
       .on("postgres_changes", { event: "*", schema: "public", table: "poker_tables" }, loadTables)
       .on("postgres_changes", { event: "*", schema: "public", table: "poker_seats" }, loadTables)
       .subscribe();
@@ -95,6 +76,10 @@ export default function Home() {
   async function createTable(event) {
     event.preventDefault();
     if (!user || busy) return;
+    if (Number(bigBlind) <= Number(smallBlind)) {
+      setMessage("The big blind must be greater than the small blind.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     const { data, error } = await supabase.rpc("create_poker_table", {
@@ -131,109 +116,116 @@ export default function Home() {
     });
     setBusy(false);
     if (error) setMessage(error.message);
-    else { setMessage(`You've joined ${table.name}. Opening table…`); window.location.href = "/table/" + table.id; }
+    else {
+      setMessage(`You've joined ${table.name}. Opening table…`);
+      window.location.href = "/table/" + table.id;
+    }
     await loadTables();
   }
 
   const displayName = user?.user_metadata?.full_name ||
     user?.user_metadata?.name || "Discord player";
+  const visibleTables = tables.filter(t => !t.is_private || t.owner_id === user?.id);
 
   return (
-    <main style={{
-      minHeight: "100vh",
-      background: "radial-gradient(ellipse at top, #32164d 0%, #08050d 55%)",
-      color: "#f4f8f3",
-      fontFamily: "Arial, sans-serif",
-      padding: "28px 16px"
-    }}>
-      <header style={{maxWidth:1100, margin:"0 auto 28px", display:"flex",
-        justifyContent:"space-between", alignItems:"center", gap:16, flexWrap:"wrap"}}>
-        <div>
-          <h1 style={{fontSize:34, margin:0, color:"#c58aff", letterSpacing:1}}>TRASHGUY POKER</h1>
-          <p style={{color:"#b9acc8", margin:"7px 0 0"}}>THE HOME OF THE TABLE</p>
-        </div>
-        <div style={{display:"flex", alignItems:"center", gap:12, flexWrap:"wrap"}}>
-          {loading ? <span>Checking account…</span> : user ? <>
-            <span>Playing as <strong>{displayName}</strong></span>
-            <button onClick={signOut} style={button("#39264c")}>SIGN OUT</button>
-          </> : <button onClick={signIn} style={button("#5865F2")}>SIGN IN WITH DISCORD</button>}
+    <main className="lobby-page">
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="Roulo Poker home">
+          <span className="brand-mark">R</span>
+          <span className="brand-name">ROULO <b>POKER</b></span>
+        </a>
+        <nav className="main-nav" aria-label="Main navigation">
+          <a className="nav-active" href="/">Poker lobby</a>
+          <span>Texas Hold’em</span>
+          <span>Private tables</span>
+        </nav>
+        <div className="account-area">
+          {loading ? <span className="muted">Checking account…</span> : user ? <>
+            <span className="signed-in">Playing as <strong>{displayName}</strong></span>
+            <button className="button button-quiet" onClick={signOut}>Sign out</button>
+          </> : <button className="button button-discord" onClick={signIn}>Sign in with Discord</button>}
         </div>
       </header>
 
-      <section style={{maxWidth:1100, margin:"0 auto", ...panel}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap"}}>
-          <div>
-            <h2 style={{margin:"0 0 6px", color:"#c58aff"}}>POKER LOBBY</h2>
-            <p style={{margin:0, color:"#b9acc8"}}>Find a table or create your own private game.</p>
-          </div>
-          <span style={{color:"#b9acc8"}}>{tables.length} waiting table{tables.length === 1 ? "" : "s"}</span>
+      <section className="hero-strip">
+        <div>
+          <div className="eyebrow"><span className="live-dot" /> PRIVATE GAMES. YOUR TABLE.</div>
+          <h1>Find your <span>seat.</span></h1>
+          <p>A clean place to play Texas Hold’em with your people.</p>
         </div>
+        <div className="hero-stat">
+          <span className="stat-number">{visibleTables.length}</span>
+          <span className="stat-label">TABLES WAITING</span>
+        </div>
+      </section>
 
-        {message && <p role="status" style={{background:"#241735", border:"1px solid #704b91", padding:12, borderRadius:10, overflowWrap:"anywhere"}}>{message}</p>}
+      {message && <p role="status" className="status-message">{message}</p>}
 
-        <div style={{marginTop:24}}>
-          {!user && <div style={{background:"#241735",border:"1px solid #704b91",padding:14,borderRadius:10,marginBottom:16}}>
-            <strong>Sign in with Discord to create or join a table.</strong>
-            <button onClick={signIn} style={{...button("#5865F2"),marginLeft:12}}>SIGN IN WITH DISCORD</button>
+      <section className="lobby-grid">
+        <div className="panel create-panel">
+          <div className="section-heading">
+            <div><span className="eyebrow">SET UP A GAME</span><h2>Create a table</h2></div>
+            <span className="heading-icon">＋</span>
+          </div>
+          {!user && <div className="signin-note">
+            <span>Sign in with Discord to create or join a table.</span>
+            <button className="button button-discord" onClick={signIn}>Connect Discord</button>
           </div>}
-          <form onSubmit={createTable} style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))", gap:12, alignItems:"end", opacity:user?1:0.65}}>
-            <label style={{display:"grid", gap:7, color:"#d9cce8"}}>
-              Table name
-              <input required maxLength={40} disabled={!user} value={tableName} onChange={e=>setTableName(e.target.value)} placeholder="Friday Night Poker" style={field}/>
+          <form onSubmit={createTable} className="table-form">
+            <label className="form-field field-wide">Table name
+              <input required maxLength={40} disabled={!user} value={tableName} onChange={e => setTableName(e.target.value)} placeholder="Friday Night Poker" />
             </label>
-            <label style={{display:"grid", gap:7, color:"#d9cce8"}}>
-              Small blind
-              <input type="number" min="1" disabled={!user} value={smallBlind} onChange={e=>setSmallBlind(e.target.value)} style={field}/>
+            <label className="form-field">Small blind
+              <input type="number" min="1" disabled={!user} value={smallBlind} onChange={e => setSmallBlind(e.target.value)} />
             </label>
-            <label style={{display:"grid", gap:7, color:"#d9cce8"}}>
-              Big blind
-              <input type="number" min="1" disabled={!user} value={bigBlind} onChange={e=>setBigBlind(e.target.value)} style={field}/>
+            <label className="form-field">Big blind
+              <input type="number" min="2" disabled={!user} value={bigBlind} onChange={e => setBigBlind(e.target.value)} />
             </label>
-            <label style={{display:"grid", gap:7, color:"#d9cce8"}}>
-              Seats
-              <select disabled={!user} value={maxPlayers} onChange={e=>setMaxPlayers(e.target.value)} style={field}>
-                {[2,3,4,5,6,7,8,9].map(n=><option key={n} value={n}>{n} players</option>)}
+            <label className="form-field">Seats
+              <select disabled={!user} value={maxPlayers} onChange={e => setMaxPlayers(e.target.value)}>
+                {[2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n} players</option>)}
               </select>
             </label>
-            <label style={{display:"flex", alignItems:"center", gap:8, color:"#d9cce8", padding:"12px 0"}}>
-              <input type="checkbox" disabled={!user} checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/> Private table
+            <label className="check-field">
+              <input type="checkbox" disabled={!user} checked={isPrivate} onChange={e => setIsPrivate(e.target.checked)} />
+              <span>Private table</span>
             </label>
-            <button type="submit" disabled={!user || busy} style={button("#7138a8", !user || busy)}>CREATE TABLE</button>
+            <button type="submit" disabled={!user || busy} className="button button-primary submit-button">{busy ? "Please wait…" : "Create table"} <span>→</span></button>
           </form>
+          <p className="panel-footnote">Virtual play chips only · No cash stakes</p>
         </div>
 
-          <div style={{marginTop:28}}>
-            <h3 style={{color:"#c58aff"}}>AVAILABLE TABLES</h3>
-            {tables.filter(t=>!t.is_private || t.owner_id === user?.id).length === 0
-              ? <p style={{color:"#b9acc8"}}>No public waiting tables yet. Create one and invite your friends.</p>
-              : <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(245px,1fr))", gap:14}}>
-                {tables.filter(t=>!t.is_private || t.owner_id === user?.id).map(table=><article key={table.id} style={{background:"#100b19", border:"1px solid #50316f", borderRadius:14, padding:16}}>
-                  <div style={{display:"flex", justifyContent:"space-between", gap:8}}>
-                    <strong>{table.name}</strong>
-                    <span style={{color:table.is_private ? "#e0b6ff" : "#c58aff", fontSize:12}}>{table.is_private ? "PRIVATE" : "PUBLIC"}</span>
-                  </div>
-                  <p style={{color:"#b9acc8", margin:"10px 0"}}>{table.small_blind}/{table.big_blind} blinds · {table.max_players} seats</p>
-                  <p style={{color:"#b9acc8"}}>{table.poker_seats?.length || 0} players seated</p>
-                  {table.is_private && table.invite_code && <p style={{color:"#e0b6ff"}}>Invite code: <strong>{table.invite_code}</strong></p>}
-                  <button disabled={busy || (table.poker_seats?.length || 0) >= table.max_players} onClick={()=>joinTable(table)} style={button("#7138a8", busy || (table.poker_seats?.length || 0) >= table.max_players)}>
-                    {(table.poker_seats?.length || 0) >= table.max_players ? "TABLE FULL" : "JOIN TABLE"}
-                  </button>
-                </article>)}
-              </div>}
+        <div className="panel tables-panel">
+          <div className="section-heading">
+            <div><span className="eyebrow">JUMP INTO A GAME</span><h2>Available tables</h2></div>
+            <button className="button button-quiet refresh-button" onClick={loadTables}>↻ Refresh</button>
           </div>
-          <button onClick={loadTables} style={{...button("#39264c"), marginTop:18}}>REFRESH LOBBY</button>
+          {visibleTables.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-symbol">♠</div>
+              <strong>No tables waiting just yet</strong>
+              <p>Be the first to open a table, then invite your friends to join.</p>
+            </div>
+          ) : (
+            <div className="table-list">
+              {visibleTables.map(table => {
+                const seated = table.poker_seats?.length || 0;
+                const full = seated >= table.max_players;
+                return <article className="table-row" key={table.id}>
+                  <div className="table-type-icon">♠</div>
+                  <div className="table-info">
+                    <strong>{table.name}</strong>
+                    <span>{table.is_private ? "Private game" : "Public game"} · {table.small_blind}/{table.big_blind} blinds</span>
+                  </div>
+                  <div className="table-seats"><strong>{seated}/{table.max_players}</strong><span>PLAYERS</span></div>
+                  <button disabled={busy || full} onClick={() => joinTable(table)} className={`button ${full ? "button-quiet" : "button-outline"}`}>{full ? "Full" : "Join"}</button>
+                </article>;
+              })}
+            </div>
+          )}
+        </div>
       </section>
-      <footer style={{textAlign:"center", color:"#718477", marginTop:28}}>TRASHGUY POKER · VIRTUAL PLAY CHIPS ONLY</footer>
+      <footer className="site-footer"><span>ROULO POKER</span><span>Texas Hold’em · Virtual play chips only</span></footer>
     </main>
   );
 }
-
-const field = {
-  width: "100%",
-  minWidth: 0,
-  background: "#0b0711",
-  color: "#fff",
-  border: "1px solid #704b91",
-  borderRadius: 9,
-  padding: "12px 10px"
-};
