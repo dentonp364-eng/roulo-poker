@@ -197,8 +197,6 @@ begin
 
   if v_flush and v_straight>0 then
     v_category:=8; v_kickers[1]:=v_straight;
-  elsif v_ranks[2:14] @> array[4]::integer[] then
-    null;
   end if;
 
   if v_category=0 then
@@ -218,7 +216,18 @@ begin
   end if;
   if v_category=0 and v_straight>0 then v_category:=4;v_kickers[1]:=v_straight; end if;
   if v_category=0 then
-    for v_i in reverse 14..2 loop if v_ranks[v_i]=3 then v_category:=3;v_kickers[1]:=v_i;exit;end if;end loop;
+    for v_i in reverse 14..2 loop
+      if v_ranks[v_i]=3 then
+        v_category:=3; v_kickers[1]:=v_i;
+        for v_j in reverse 14..2 loop
+          if v_ranks[v_j]>0 and v_j<>v_i then
+            if v_kickers[2]=0 then v_kickers[2]:=v_j;
+            elsif v_kickers[3]=0 then v_kickers[3]:=v_j; exit; end if;
+          end if;
+        end loop;
+        exit;
+      end if;
+    end loop;
   end if;
   if v_category=0 then
     for v_i in reverse 14..2 loop
@@ -304,6 +313,7 @@ declare
   v_remainder bigint;
   v_new_phase text;
   v_street_bet bigint;
+  v_n integer:=0;
   v_contrib jsonb;
   v_folded jsonb;
   v_acted jsonb;
@@ -397,15 +407,24 @@ begin
       select pot into v_share from public.poker_hand_state where table_id=p_table_id;
       v_remainder:=v_share % jsonb_array_length(v_winners);
       v_share:=v_share / jsonb_array_length(v_winners);
-      update public.poker_seats s set chips=chips+v_share+
-        case when row_number() over (order by s.seat_number)<=v_remainder then 1 else 0 end
-      where s.table_id=p_table_id and s.player_id in (select value::uuid from jsonb_array_elements_text(v_winners));
+      v_n := 0;
+      for v_player in
+        select s.player_id from public.poker_seats s
+        where s.table_id=p_table_id and s.player_id in (select value::uuid from jsonb_array_elements_text(v_winners))
+        order by s.seat_number
+      loop
+        v_n := v_n + 1;
+        update public.poker_seats set chips=chips+v_share+
+          case when v_n<=v_remainder then 1 else 0 end
+        where table_id=p_table_id and player_id=v_player.player_id;
+      end loop;
       update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now() where table_id=p_table_id;
       return jsonb_build_object('phase','showdown','winners',v_winners,'pot_awarded',v_share*jsonb_array_length(v_winners)+v_remainder,'board',v_board);
     end if;
 
     v_street_bet:=0;
     v_acted:='[]'::jsonb;
+    v_contrib:='{}'::jsonb;
     update public.poker_hand_state set phase=v_new_phase,board=v_board,current_bet=0,
       contributions='{}'::jsonb,acted_seats='[]'::jsonb,updated_at=now() where table_id=p_table_id;
   end if;
