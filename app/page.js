@@ -137,8 +137,9 @@ export default function Home() {
         </a>
         <nav className="main-nav" aria-label="Main navigation">
           <a className="nav-active" href="/">Poker lobby</a>
+          <a href="/history">Hand history</a>
+          {user && <a href={"/profile/" + user.id}>My profile</a>}
           <span>Texas Hold’em</span>
-          <span>Private tables</span>
         </nav>
         <div className="account-area">
           {loading ? <span className="muted">Checking account…</span> : user ? <>
