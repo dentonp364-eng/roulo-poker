@@ -403,7 +403,10 @@ begin
   select count(*) into v_pending from public.poker_seats s
   where s.table_id=p_table_id and s.chips>0
     and not (v_folded @> jsonb_build_array(s.seat_number))
-    and not (v_acted @> jsonb_build_array(s.seat_number));
+    and (
+      not (v_acted @> jsonb_build_array(s.seat_number))
+      or coalesce((v_contrib->>s.seat_number::text)::bigint,0) < v_state.current_bet
+    );
   if v_pending=0 then
     -- All live players have acted and matched the current wager: deal next street.
     select cards into v_deck from public.poker_private_decks where table_id=p_table_id and hand_number=v_state.hand_number;
