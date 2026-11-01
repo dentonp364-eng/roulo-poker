@@ -37,7 +37,7 @@ export default function Home() {
   const loadTables = useCallback(async () => {
     const { data, error } = await supabase
       .from("poker_tables")
-      .select("id,name,small_blind,big_blind,max_players,is_private,status,created_at,invite_code,poker_seats(id,player_id,seat_number)")
+      .select("id,name,owner_id,small_blind,big_blind,max_players,is_private,status,created_at,invite_code,poker_seats(id,player_id,seat_number)")
       .eq("status", "waiting")
       .order("created_at", { ascending: false });
     if (error) {
@@ -170,35 +170,36 @@ export default function Home() {
 
         {message && <p role="status" style={{background:"#17291d", border:"1px solid #426b49", padding:12, borderRadius:10, overflowWrap:"anywhere"}}>{message}</p>}
 
-        {!user ? <div style={{textAlign:"center", padding:"38px 12px"}}>
-          <h3>Sign in to enter the lobby</h3>
-          <p style={{color:"#a8b9aa"}}>Use your Discord account to create tables and join friends.</p>
-          <button onClick={signIn} style={button("#5865F2")}>SIGN IN WITH DISCORD</button>
-        </div> : <>
-          <form onSubmit={createTable} style={{marginTop:24, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))", gap:12, alignItems:"end"}}>
+        <div style={{marginTop:24}}>
+          {!user && <div style={{background:"#17291d",border:"1px solid #426b49",padding:14,borderRadius:10,marginBottom:16}}>
+            <strong>Sign in with Discord to create or join a table.</strong>
+            <button onClick={signIn} style={{...button("#5865F2"),marginLeft:12}}>SIGN IN WITH DISCORD</button>
+          </div>}
+          <form onSubmit={createTable} style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))", gap:12, alignItems:"end", opacity:user?1:0.65}}>
             <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
               Table name
-              <input required maxLength={40} value={tableName} onChange={e=>setTableName(e.target.value)} placeholder="Friday Night Poker" style={field}/>
+              <input required maxLength={40} disabled={!user} value={tableName} onChange={e=>setTableName(e.target.value)} placeholder="Friday Night Poker" style={field}/>
             </label>
             <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
               Small blind
-              <input type="number" min="1" value={smallBlind} onChange={e=>setSmallBlind(e.target.value)} style={field}/>
+              <input type="number" min="1" disabled={!user} value={smallBlind} onChange={e=>setSmallBlind(e.target.value)} style={field}/>
             </label>
             <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
               Big blind
-              <input type="number" min="1" value={bigBlind} onChange={e=>setBigBlind(e.target.value)} style={field}/>
+              <input type="number" min="1" disabled={!user} value={bigBlind} onChange={e=>setBigBlind(e.target.value)} style={field}/>
             </label>
             <label style={{display:"grid", gap:7, color:"#c9d8ca"}}>
               Seats
-              <select value={maxPlayers} onChange={e=>setMaxPlayers(e.target.value)} style={field}>
+              <select disabled={!user} value={maxPlayers} onChange={e=>setMaxPlayers(e.target.value)} style={field}>
                 {[2,3,4,5,6,7,8,9].map(n=><option key={n} value={n}>{n} players</option>)}
               </select>
             </label>
             <label style={{display:"flex", alignItems:"center", gap:8, color:"#c9d8ca", padding:"12px 0"}}>
-              <input type="checkbox" checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/> Private table
+              <input type="checkbox" disabled={!user} checked={isPrivate} onChange={e=>setIsPrivate(e.target.checked)}/> Private table
             </label>
-            <button type="submit" disabled={busy} style={button("#247d43", busy)}>CREATE TABLE</button>
+            <button type="submit" disabled={!user || busy} style={button("#247d43", !user || busy)}>CREATE TABLE</button>
           </form>
+        </div>
 
           <div style={{marginTop:28}}>
             <h3 style={{color:"#7dff69"}}>AVAILABLE TABLES</h3>
