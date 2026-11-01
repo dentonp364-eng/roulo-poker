@@ -31,25 +31,45 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const { data, error } = await supabase.auth.getUser();
+    supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return;
       if (error) setMessage(error.message);
-      setUser(data.user);
-      if (data.user) {
-        const { data: adminAccess } = await supabase.rpc("is_poker_admin");
-        if (!mounted) return;
-        setIsAdmin(adminAccess === true);
-      } else {
+      const nextUser = data?.user ?? null;
+      setUser(nextUser);
+      if (!nextUser) {
         setIsAdmin(false);
+        setLoading(false);
+        return;
       }
+      supabase.rpc("is_poker_admin").then(({ data: adminAccess, error: adminError }) => {
+        if (!mounted) return;
+        if (adminError) setMessage(adminError.message);
+        setIsAdmin(adminAccess === true);
+        setLoading(false);
+      }).catch((adminError) => {
+        if (!mounted) return;
+        setIsAdmin(false);
+        setMessage(adminError.message || "Unable to check admin access.");
+        setLoading(false);
+      });
+    }).catch((authError) => {
+      if (!mounted) return;
+      setMessage(authError.message || "Unable to check your account.");
+      setUser(null);
+      setIsAdmin(false);
       setLoading(false);
-    })();
+    });
+
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null;
       setUser(nextUser);
-      if (!nextUser) setIsAdmin(false);
-      else supabase.rpc("is_poker_admin").then(({ data }) => setIsAdmin(data === true));
+      if (!nextUser) {
+        setIsAdmin(false);
+      } else {
+        supabase.rpc("is_poker_admin")
+          .then(({ data }) => setIsAdmin(data === true))
+          .catch(() => setIsAdmin(false));
+      }
     });
     return () => {
       mounted = false;
