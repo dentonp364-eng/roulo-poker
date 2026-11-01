@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tables, setTables] = useState([]);
   const [tableName, setTableName] = useState("");
@@ -34,10 +35,20 @@ export default function Home() {
       if (!mounted) return;
       if (error) setMessage(error.message);
       setUser(data.user);
+      if (data.user) {
+        const { data: adminAccess } = await supabase.rpc("is_poker_admin");
+        if (!mounted) return;
+        setIsAdmin(adminAccess === true);
+      } else {
+        setIsAdmin(false);
+      }
       setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const nextUser = session?.user ?? null;
+      setUser(nextUser);
+      if (!nextUser) setIsAdmin(false);
+      else supabase.rpc("is_poker_admin").then(({ data }) => setIsAdmin(data === true));
     });
     return () => {
       mounted = false;
@@ -139,6 +150,7 @@ export default function Home() {
           <a className="nav-active" href="/">Poker lobby</a>
           <a href="/history">Hand history</a>
           {user && <a href={"/profile/" + user.id}>My profile</a>}
+          {user && isAdmin && <a href="/admin">Admin</a>}
           <span>Texas Hold’em</span>
         </nav>
         <div className="account-area">
