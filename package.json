@@ -1,5 +1,5 @@
 {
-  "name": "trashguy-poker",
+  "name": "roulo-poker",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start"
   },
- "dependencies": {
-  "next": "15.5.28",
-  "@supabase/supabase-js": "^2.57.0",
-  "react": "19.1.1",
-  "react-dom": "19.1.1"
+  "dependencies": {
+    "next": "15.5.28",
+    "@supabase/supabase-js": "^2.57.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
   }
 }
