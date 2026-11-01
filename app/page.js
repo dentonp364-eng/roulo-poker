@@ -131,8 +131,8 @@ export default function Home() {
     <main className="lobby-page">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Roulo Poker home">
-          <span className="brand-mark">R</span>
-          <span className="brand-name">ROULO <b>POKER</b></span>
+          <span className="brand-wordmark">ROULO</span>
+          <span className="brand-name"><b>POKER</b></span>
         </a>
         <nav className="main-nav" aria-label="Main navigation">
           <a className="nav-active" href="/">Poker lobby</a>
