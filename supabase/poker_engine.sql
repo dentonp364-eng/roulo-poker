@@ -10,11 +10,16 @@ create table if not exists public.poker_hand_state (
   current_bet bigint not null default 0,
   acting_seat integer,
   dealer_seat integer,
-  deck jsonb not null default '[]'::jsonb,
   contributions jsonb not null default '{}'::jsonb,
   folded_seats jsonb not null default '[]'::jsonb,
   acted_seats jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
+);
+
+create table if not exists public.poker_private_decks (
+  table_id uuid primary key references public.poker_tables(id) on delete cascade,
+  hand_number integer not null,
+  cards jsonb not null
 );
 
 create table if not exists public.poker_hole_cards (
@@ -27,6 +32,8 @@ create table if not exists public.poker_hole_cards (
 
 alter table public.poker_hand_state enable row level security;
 alter table public.poker_hole_cards enable row level security;
+alter table public.poker_private_decks enable row level security;
+revoke all on public.poker_private_decks from anon, authenticated;
 
 drop policy if exists "Players can read hand state at seated tables" on public.poker_hand_state;
 create policy "Players can read hand state at seated tables"
@@ -67,6 +74,8 @@ declare
   v_sb integer;
   v_bb integer;
   v_pot bigint := 0;
+  v_sb_paid bigint := 0;
+  v_bb_paid bigint := 0;
   v_actor integer;
 begin
   if v_user is null then raise exception 'Sign in first'; end if;
@@ -97,6 +106,7 @@ begin
   select jsonb_agg(value order by random()) into v_deck from jsonb_array_elements(v_deck);
 
   delete from public.poker_hole_cards where table_id=p_table_id;
+  delete from public.poker_private_decks where table_id=p_table_id;
   v_n := 0;
   for v_seat in
     select s.* from public.poker_seats s
@@ -116,23 +126,22 @@ begin
     and seat_number > v_sb order by seat_number limit 1),
     (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0 and seat_number<>v_sb));
 
-  update public.poker_seats set chips=chips-least(chips,v_table.small_blind)
-    where table_id=p_table_id and seat_number=v_sb;
-  v_pot := least((select chips from public.poker_seats where table_id=p_table_id and seat_number=v_sb) + v_table.small_blind,v_table.small_blind);
-  update public.poker_seats set chips=chips-least(chips,v_table.big_blind)
-    where table_id=p_table_id and seat_number=v_bb;
-  v_pot := v_pot + least((select chips from public.poker_seats where table_id=p_table_id and seat_number=v_bb) + v_table.big_blind,v_table.big_blind);
+  select least(chips,v_table.small_blind) into v_sb_paid from public.poker_seats where table_id=p_table_id and seat_number=v_sb;
+  update public.poker_seats set chips=chips-v_sb_paid where table_id=p_table_id and seat_number=v_sb;
+  select least(chips,v_table.big_blind) into v_bb_paid from public.poker_seats where table_id=p_table_id and seat_number=v_bb;
+  update public.poker_seats set chips=chips-v_bb_paid where table_id=p_table_id and seat_number=v_bb;
+  v_pot := v_sb_paid + v_bb_paid;
 
   v_actor := coalesce((select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0 and seat_number>v_bb),
                       (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0));
 
-  insert into public.poker_hand_state(table_id,hand_number,phase,board,pot,current_bet,acting_seat,dealer_seat,deck,contributions,folded_seats,acted_seats,updated_at)
-  values(p_table_id,v_hand,'preflop',v_board,v_pot,v_table.big_blind,v_actor,v_dealer,v_deck,
-    jsonb_build_object(v_sb::text,least(v_table.small_blind,(select chips from public.poker_seats where table_id=p_table_id and seat_number=v_sb)+v_table.small_blind),
-                       v_bb::text,v_table.big_blind),'[]'::jsonb,'[]'::jsonb,now())
+  insert into public.poker_private_decks(table_id,hand_number,cards) values(p_table_id,v_hand,v_deck);
+  insert into public.poker_hand_state(table_id,hand_number,phase,board,pot,current_bet,acting_seat,dealer_seat,contributions,folded_seats,acted_seats,updated_at)
+  values(p_table_id,v_hand,'preflop',v_board,v_pot,v_bb_paid,v_actor,v_dealer,
+    jsonb_build_object(v_sb::text,v_sb_paid,v_bb::text,v_bb_paid),'[]'::jsonb,'[]'::jsonb,now())
   on conflict(table_id) do update set hand_number=excluded.hand_number,phase=excluded.phase,board=excluded.board,
     pot=excluded.pot,current_bet=excluded.current_bet,acting_seat=excluded.acting_seat,dealer_seat=excluded.dealer_seat,
-    deck=excluded.deck,contributions=excluded.contributions,folded_seats=excluded.folded_seats,acted_seats=excluded.acted_seats,updated_at=now();
+    contributions=excluded.contributions,folded_seats=excluded.folded_seats,acted_seats=excluded.acted_seats,updated_at=now();
 
   return jsonb_build_object('hand_number',v_hand,'phase','preflop','pot',v_pot,'acting_seat',v_actor);
 end;
