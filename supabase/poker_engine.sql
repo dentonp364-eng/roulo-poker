@@ -1,4 +1,4 @@
--- Trashguy Poker: server-authoritative hand foundation (virtual chips only)
+-- Roulo Poker: server-authoritative hand foundation (virtual chips only)
 -- Run in Supabase SQL Editor after setup_lobby.sql.
 
 create table if not exists public.poker_hand_state (
