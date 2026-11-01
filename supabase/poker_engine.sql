@@ -14,7 +14,8 @@ create table if not exists public.poker_hand_state (
   folded_seats jsonb not null default '[]'::jsonb,
   acted_seats jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now(),
-  last_raise_size bigint not null default 0
+  last_raise_size bigint not null default 0,
+  total_contributions jsonb not null default '{}'::jsonb
 );
 
 create table if not exists public.poker_private_decks (
@@ -32,6 +33,7 @@ create table if not exists public.poker_hole_cards (
 );
 
 alter table public.poker_hand_state add column if not exists last_raise_size bigint not null default 0;
+alter table public.poker_hand_state add column if not exists total_contributions jsonb not null default '{}'::jsonb;
 
 alter table public.poker_hand_state enable row level security;
 alter table public.poker_hole_cards enable row level security;
@@ -148,7 +150,7 @@ begin
     jsonb_build_object(v_sb::text,v_sb_paid,v_bb::text,v_bb_paid),'[]'::jsonb,'[]'::jsonb,now(),v_table.big_blind)
   on conflict(table_id) do update set hand_number=excluded.hand_number,phase=excluded.phase,board=excluded.board,
     pot=excluded.pot,current_bet=excluded.current_bet,acting_seat=excluded.acting_seat,dealer_seat=excluded.dealer_seat,
-    contributions=excluded.contributions,folded_seats=excluded.folded_seats,acted_seats=excluded.acted_seats,updated_at=now(),last_raise_size=excluded.last_raise_size;
+    contributions=excluded.contributions,folded_seats=excluded.folded_seats,acted_seats=excluded.acted_seats,updated_at=now(),last_raise_size=excluded.last_raise_size,total_contributions=excluded.contributions;
 
   return jsonb_build_object('hand_number',v_hand,'phase','preflop','pot',v_pot,'acting_seat',v_actor);
 end;
@@ -328,6 +330,7 @@ declare
   v_acted jsonb;
   v_raise_increment bigint;
   v_all_in boolean := false;
+  v_total_contrib jsonb;
 begin
   if v_user is null then raise exception 'Sign in first'; end if;
   select * into v_table from public.poker_tables where id=p_table_id for update;
@@ -340,6 +343,7 @@ begin
   if v_seat.chips<0 then raise exception 'Invalid chip balance'; end if;
 
   v_contrib:=v_state.contributions;
+  v_total_contrib:=v_state.total_contributions;
   v_folded:=v_state.folded_seats;
   v_acted:=v_state.acted_seats;
   v_to_call:=greatest(0,v_state.current_bet-coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0));
@@ -356,6 +360,7 @@ begin
     update public.poker_seats set chips=chips-v_paid where id=v_seat.id;
     v_contrib:=jsonb_set(v_contrib,array[v_seat.seat_number::text],to_jsonb(coalesce((v_contrib->>v_seat.seat_number::text)::bigint,0)+v_paid),true);
     update public.poker_hand_state set pot=pot+v_paid where table_id=p_table_id;
+    v_total_contrib:=jsonb_set(v_total_contrib,array[v_seat.seat_number::text],to_jsonb(coalesce((v_total_contrib->>v_seat.seat_number::text)::bigint,0)+v_paid),true);
     v_acted:=v_acted||jsonb_build_array(v_seat.seat_number);
   elsif p_action in ('bet','raise') then
     if p_amount<=v_state.current_bet then raise exception 'Bet/raise must exceed the current bet'; end if;
@@ -374,6 +379,7 @@ begin
     update public.poker_seats set chips=chips-v_target where id=v_seat.id;
     v_contrib:=jsonb_set(v_contrib,array[v_seat.seat_number::text],to_jsonb(p_amount),true);
     update public.poker_hand_state set pot=pot+v_target,current_bet=p_amount where table_id=p_table_id;
+    v_total_contrib:=jsonb_set(v_total_contrib,array[v_seat.seat_number::text],to_jsonb(coalesce((v_total_contrib->>v_seat.seat_number::text)::bigint,0)+v_target),true);
     if v_all_in and v_raise_increment < greatest(v_state.last_raise_size,v_table.big_blind) then
       -- A short all-in increases the price but does not reopen action for players who already acted.
       v_acted:=v_acted||jsonb_build_array(v_seat.seat_number);
@@ -469,7 +475,7 @@ begin
     where s.table_id=p_table_id and s.chips>0
       and not (v_folded @> jsonb_build_array(s.seat_number));
   end if;
-  update public.poker_hand_state set acting_seat=v_next,contributions=v_contrib,
+  update public.poker_hand_state set acting_seat=v_next,contributions=v_contrib,total_contributions=v_total_contrib,
     folded_seats=v_folded,acted_seats=v_acted,updated_at=now() where table_id=p_table_id;
   return jsonb_build_object('ok',true,'next_seat',v_next,'phase',coalesce(v_new_phase,v_state.phase));
 end;
