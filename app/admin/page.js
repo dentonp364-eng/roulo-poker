@@ -84,7 +84,7 @@ export default function AdminPage() {
   if (!authorized) return <main className="admin-shell"><section className="admin-gate"><span className="admin-kicker">RESTRICTED AREA</span><h1>Admin access only</h1><p>This account has not been added to the Roulo Poker admin list.</p><button onClick={() => router.push("/")}>Back to lobby</button></section></main>;
 
   return <main className="admin-shell">
-    <header className="admin-topbar"><a className="admin-brand" href="/">ROULO <b>POKER</b></a><div><span className="admin-kicker">CONTROL ROOM</span><h1>Admin panel</h1></div><button className="admin-secondary" onClick={() => router.push("/")}>← Lobby</button></header>
+    <header className="admin-topbar"><a className="admin-brand" href="/"><img src="/roulo-logo.svg" alt="Roulo Poker" /></a><div><span className="admin-kicker">CONTROL ROOM</span><h1>Admin panel</h1></div><button className="admin-secondary" onClick={() => router.push("/")}>← Lobby</button></header>
     {message && <div className="admin-message" role="status">{message}</div>}
     <section className="admin-metrics">
       <article><span>ALL TABLES</span><strong>{tables.length}</strong></article>
