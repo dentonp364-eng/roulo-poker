@@ -223,3 +223,12 @@ a { color: inherit; text-decoration: none; }
 .action-panel button:not(:disabled):hover{border-color:#b7ed54;box-shadow:0 0 14px #b7ed5433}
 .action-panel .action-primary:not(:disabled){background:linear-gradient(180deg,#c8f875,#a5d943);color:#10170c;border-color:#d5fa91}
 .action-panel button:disabled{opacity:.32;cursor:not-allowed}
+
+
+/* Dealer marker and clear active-turn feedback */
+.player-seat.is-acting{border-color:#d8ff8b;box-shadow:0 0 0 2px #c4f16b66,0 0 28px #b7ed5470,0 8px 25px #000b;transform:translateY(-2px)}
+.player-seat.is-acting:after{content:"";position:absolute;inset:-5px;border:1px solid #b7ed5477;border-radius:19px;pointer-events:none;animation:roulo-turn-pulse 1.8s ease-in-out infinite}
+.turn-pill{justify-self:start;padding:3px 6px;border-radius:4px;background:#c5f37d;color:#10170c;font-size:8px;font-style:normal;font-weight:950;letter-spacing:1px}
+.table-current-bet{padding-top:5px;border-top:1px solid #9acb4b33;color:#e3f4c7!important}
+@keyframes roulo-turn-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.player-seat.is-acting:after{animation:none}}
