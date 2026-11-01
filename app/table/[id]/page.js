@@ -54,11 +54,11 @@ export default function PokerTablePage() {
     <section style={{maxWidth:1100,margin:"auto",background:"linear-gradient(145deg,#263226,#151b16 65%,#090b0a)",border:"8px solid #526b39",borderRadius:220,padding:"48px 24px",minHeight:490,boxShadow:"0 0 45px #8fbe3844,inset 0 0 35px #08040c",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:22}}>
       <div style={{color:"#d7edb9",fontWeight:900,letterSpacing:3}}>ROULO • TEXAS HOLD’EM</div>
       <div style={{display:"flex",gap:9}}>{["A♠","K♥","Q♦","J♣","10♠"].map((v,i)=><div key={i}>{card(v)}</div>)}</div>
-      <div style={{textAlign:"center",background:"#100819cc",border:"1px solid #8d5bb4",borderRadius:14,padding:"12px 28px"}}>
-        <div style={{fontSize:11,color:"#aeb8ab",letterSpacing:2}}>POT</div><strong style={{fontSize:28,color:"#e0b6ff"}}>0</strong><div style={{fontSize:11,color:"#aeb8ab"}}>VIRTUAL CHIPS</div>
+      <div style={{textAlign:"center",background:"#0c100dcc",border:"1px solid #526b39",borderRadius:14,padding:"12px 28px"}}>
+        <div style={{fontSize:11,color:"#aeb8ab",letterSpacing:2}}>POT</div><strong style={{fontSize:28,color:"#c8f17b"}}>0</strong><div style={{fontSize:11,color:"#aeb8ab"}}>VIRTUAL CHIPS</div>
       </div>
       <div style={{display:"flex",gap:10,alignItems:"center"}}>{card("🂠")}{card("🂠")}</div>
-      <div style={{color:"#d9cce8",fontSize:13}}>Table is ready · Game engine setup is the next step</div>
+      <div style={{color:"#d5dfd0",fontSize:13}}>Table is ready · Game engine setup is the next step</div>
     </section>
     <section style={{maxWidth:1100,margin:"22px auto",background:"#121613",border:"1px solid #29332b",borderRadius:16,padding:20}}>
       <h2 style={{marginTop:0,color:"#b7ed54"}}>PLAYERS AT THIS TABLE</h2>
@@ -75,5 +75,5 @@ export default function PokerTablePage() {
   </main>;
 }
 
-const page = {minHeight:"100vh",padding:"28px 16px",background:"radial-gradient(ellipse at top,#263226 0%,#08050d 65%)",color:"#f6f0ff",fontFamily:"Arial,sans-serif"};
-const secondary = {background:"#39264c",color:"#fff",border:"1px solid #8054a3",borderRadius:10,padding:"12px 18px",fontWeight:800,cursor:"pointer"};
+const page = {minHeight:"100vh",padding:"28px 16px",background:"radial-gradient(ellipse at top,#263226 0%,#090b0a 65%)",color:"#f4f6f1",fontFamily:"Arial,sans-serif"};
+const secondary = {background:"#1b251a",color:"#fff",border:"1px solid #8054a3",borderRadius:10,padding:"12px 18px",fontWeight:800,cursor:"pointer"};
