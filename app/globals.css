@@ -190,3 +190,14 @@ a { color: inherit; text-decoration: none; }
 .admin-empty{padding:40px;text-align:center;color:#99a493;font-size:13px}.admin-footnote{margin:15px 2px 0;line-height:1.6}
 .admin-gate{max-width:480px;margin:15vh auto;padding:35px;border:1px solid #34432f;border-radius:16px;background:#121a13;text-align:center}.admin-gate h1{margin:12px 0}.admin-gate p{color:#a5b19e;font-size:13px;line-height:1.6}.admin-gate button{margin-top:12px}
 @media(max-width:650px){.admin-shell{padding:16px 12px}.admin-topbar{grid-template-columns:1fr auto}.admin-topbar>div{grid-column:1/-1;grid-row:2}.admin-topbar h1{text-align:left}.admin-metrics{gap:7px}.admin-metrics article{padding:12px 9px}.admin-metrics strong{font-size:22px}.admin-metrics span{font-size:8px}.admin-panel{padding:15px}.admin-section-head{align-items:flex-start}.admin-section-head h2{font-size:18px}}
+
+
+.admin-users-panel{margin-bottom:18px}
+.admin-promote-form{display:grid;gap:8px;margin:8px 0 18px;padding:15px;border:1px solid #2b3929;border-radius:10px;background:#101710}
+.admin-promote-form label{font-size:10px;font-weight:850;letter-spacing:.7px;color:#aab8a1}
+.admin-promote-form>div{display:flex;gap:9px}
+.admin-promote-form input{flex:1;min-width:0;padding:11px 12px;border:1px solid #3a4a36;border-radius:8px;background:#080e09;color:#f3f6ef;font:inherit;font-size:12px}
+.admin-promote-form button,.admin-revoke{border:1px solid #668b3d;border-radius:8px;padding:10px 14px;background:#b7ed54;color:#10170c;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+.admin-promote-form button:disabled,.admin-revoke:disabled{opacity:.45;cursor:not-allowed}
+.admin-revoke{border-color:#703b35;background:#321a18;color:#ffaaa0}
+@media(max-width:520px){.admin-promote-form>div{flex-direction:column}.admin-promote-form button{align-self:flex-start}}
