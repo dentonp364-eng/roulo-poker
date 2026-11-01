@@ -29,6 +29,7 @@ export default function PokerTablePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data: auth }, { data, error: tableError }] = await Promise.all([
@@ -71,6 +72,18 @@ export default function PokerTablePage() {
     return () => { supabase.removeChannel(channel); };
   }, [load, tableId]);
 
+  async function takeAction(action, amount = 0) {
+    if (acting) return;
+    setActing(true);
+    setError("");
+    const { error: actionError } = await supabase.rpc("poker_player_action", {
+      p_table_id: tableId, p_action: action, p_amount: amount
+    });
+    setActing(false);
+    if (actionError) setError(actionError.message);
+    else await load();
+  }
+
   async function startHand() {
     if (starting) return;
     setStarting(true);
@@ -90,6 +103,10 @@ export default function PokerTablePage() {
   const isSeated = players.some(p => p.player_id === user?.id);
   const phase = hand?.phase || "waiting";
   const board = Array.isArray(hand?.board) ? hand.board : [];
+  const mySeat = players.find(p => p.player_id === user?.id);
+  const myTurn = !!mySeat && hand?.acting_seat === mySeat.seat_number && ["preflop","flop","turn","river"].includes(phase);
+  const myContribution = Number(hand?.contributions?.[String(mySeat?.seat_number)] || 0);
+  const toCall = Math.max(0, Number(hand?.current_bet || 0) - myContribution);
   const canStart = isSeated && players.filter(p => Number(p.chips) > 0).length >= 2 && (!hand || phase === "waiting" || phase === "showdown");
 
   return <main className="poker-shell">
@@ -106,7 +123,7 @@ export default function PokerTablePage() {
           <div className="table-kicker">{phase === "waiting" ? "TABLE READY" : `HAND ${hand?.hand_number || ""} · ${phase.toUpperCase()}`}</div>
           <div className="community-cards">{Array.from({length:5},(_,n)=><PlayingCard key={n} card={board[n]} faceDown={!board[n]} />)}</div>
           <div className="pot-display"><small>POT</small><strong>{Number(hand?.pot || 0).toLocaleString()}</strong><span>VIRTUAL CHIPS</span></div>
-          <div className="hand-waiting">{phase === "waiting" ? "Waiting to start a hand" : "Hand in progress · betting actions coming next"}</div>
+          <div className="hand-waiting">{phase === "waiting" ? "Waiting to start a hand" : phase === "showdown" ? "Hand complete · ready for the next deal" : myTurn ? "YOUR TURN TO ACT" : `Waiting for seat ${hand?.acting_seat ?? "—"}`}</div>
           {canStart && <button className="start-hand-button" onClick={startHand} disabled={starting}>{starting ? "DEALING…" : "DEAL NEXT HAND"}</button>}
         </div>
         {seats.map((player,i)=><div className={`player-seat seat-${i+1} ${player?"occupied":""}`} key={i}>
@@ -120,8 +137,12 @@ export default function PokerTablePage() {
         <PlayingCard card={holeCards[0]} faceDown={!holeCards[0]} />
         <PlayingCard card={holeCards[1]} faceDown={!holeCards[1]} />
       </div>
-      <div className="action-panel"><button disabled>FOLD</button><button className="action-primary" disabled>CHECK / CALL</button><button disabled>BET / RAISE</button></div>
+      <div className="action-panel">
+        <button disabled={!myTurn || acting} onClick={() => takeAction("fold")}>FOLD</button>
+        <button className="action-primary" disabled={!myTurn || acting} onClick={() => takeAction(toCall > 0 ? "call" : "check")}>{toCall > 0 ? `CALL ${toCall.toLocaleString()}` : "CHECK"}</button>
+        <button disabled={!myTurn || acting || Number(mySeat?.chips || 0) <= toCall} onClick={() => takeAction(hand?.current_bet > 0 ? "raise" : "bet", Number(hand?.current_bet || 0) + Number(table.big_blind))}>{hand?.current_bet > 0 ? "RAISE" : "BET"} {Number(table.big_blind).toLocaleString()}</button>
+      </div>
     </section>
-    <p className="prototype-note">{isSeated ? "Your seat is connected · " : "Join this table from the lobby to play · "}Cards are dealt privately to each player · Virtual chips only</p>
+    <p className="prototype-note">{isSeated ? `Your seat: ${mySeat?.seat_number} · ` : "Join this table from the lobby to play · "}{myTurn ? "It's your turn · " : ""}Cards are dealt privately to each player · Virtual chips only</p>
   </main>;
 }
