@@ -106,6 +106,8 @@ export default function PokerTablePage() {
   const mySeat = players.find(p => p.player_id === user?.id);
   const myTurn = !!mySeat && hand?.acting_seat === mySeat.seat_number && ["preflop","flop","turn","river"].includes(phase);
   const myContribution = Number(hand?.contributions?.[String(mySeat?.seat_number)] || 0);
+  const dealerSeat = Number(hand?.dealer_seat || 0);
+  const actingSeat = Number(hand?.acting_seat || 0);
   const toCall = Math.max(0, Number(hand?.current_bet || 0) - myContribution);
   const canStart = isSeated && players.filter(p => Number(p.chips) > 0).length >= 2 && (!hand || phase === "waiting" || phase === "showdown");
 
@@ -122,13 +124,13 @@ export default function PokerTablePage() {
         <div className="table-center">
           <div className="table-kicker">{phase === "waiting" ? "TABLE READY" : `HAND ${hand?.hand_number || ""} · ${phase.toUpperCase()}`}</div>
           <div className="community-cards">{Array.from({length:5},(_,n)=><PlayingCard key={n} card={board[n]} faceDown={!board[n]} />)}</div>
-          <div className="pot-display"><small>POT</small><strong>{Number(hand?.pot || 0).toLocaleString()}</strong><span>VIRTUAL CHIPS</span></div>
+          <div className="pot-display"><small>POT</small><strong>{Number(hand?.pot || 0).toLocaleString()}</strong><span>VIRTUAL CHIPS</span>{hand?.current_bet > 0 && <small className="table-current-bet">CURRENT BET {Number(hand.current_bet).toLocaleString()}</small>}</div>
           <div className="hand-waiting">{phase === "waiting" ? "Waiting to start a hand" : phase === "showdown" ? "Hand complete · ready for the next deal" : myTurn ? "YOUR TURN TO ACT" : `Waiting for seat ${hand?.acting_seat ?? "—"}`}</div>
           {canStart && <button className="start-hand-button" onClick={startHand} disabled={starting}>{starting ? "DEALING…" : "DEAL NEXT HAND"}</button>}
         </div>
-        {seats.map((player,i)=><div className={`player-seat seat-${i+1} ${player?"occupied":""}`} key={i}>
+        {seats.map((player,i)=><div className={`player-seat seat-${i+1} ${player?"occupied":""} ${actingSeat===i+1?"is-acting":""}`} key={i}>
           <div className="seat-avatar">{player?.profile?.avatar_url?<img src={player.profile.avatar_url} alt="" />:<span>{player?"♠":"+"}</span>}</div>
-          <div className="seat-copy"><small>SEAT {i+1}</small><strong>{player?.profile?.discord_name || "EMPTY SEAT"}</strong><span>{player?Number(player.chips).toLocaleString()+" chips":"Waiting for player"}</span></div>
+          <div className="seat-copy"><small>SEAT {i+1} {dealerSeat===i+1 ? " · DEALER" : ""}</small><strong>{player?.profile?.discord_name || "EMPTY SEAT"}</strong><span>{player?Number(player.chips).toLocaleString()+" chips":"Waiting for player"}</span>{actingSeat===i+1 && <em className="turn-pill">TO ACT</em>}</div>
         </div>)}
       </div>
     </section>
