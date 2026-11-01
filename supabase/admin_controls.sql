@@ -82,3 +82,56 @@ grant execute on function public.admin_set_poker_table_status(uuid,text) to auth
 -- After signing in once, copy your UUID from Supabase Authentication > Users,
 -- then run this separately, replacing the placeholder:
 -- insert into public.poker_admins(user_id) values ('YOUR-AUTH-USER-UUID');
+
+
+-- Admin role assignment/revocation by registered Roulo Poker email.
+create or replace function public.admin_list_users()
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare v_result jsonb;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',u.id,'email',u.email,
+    'display_name',coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker player'),
+    'is_admin',exists(select 1 from public.poker_admins a where a.user_id=u.id)
+  ) order by lower(coalesce(u.email,''))),'[]'::jsonb)
+  into v_result from auth.users u
+  left join public.player_profiles p on p.id=u.id
+  where u.deleted_at is null;
+  return v_result;
+end;
+$$;
+
+create or replace function public.admin_assign_role_by_email(p_email text)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare v_target uuid;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+  if nullif(trim(p_email),'') is null then raise exception 'Enter a registered account email'; end if;
+  select id into v_target from auth.users where lower(email)=lower(trim(p_email)) and deleted_at is null limit 1;
+  if v_target is null then raise exception 'No registered Roulo Poker account found with that email'; end if;
+  insert into public.poker_admins(user_id) values(v_target) on conflict(user_id) do nothing;
+  return jsonb_build_object('assigned',true,'user_id',v_target);
+end;
+$$;
+
+create or replace function public.admin_revoke_role(p_user_id uuid)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+  if p_user_id=auth.uid() then raise exception 'You cannot revoke your own admin role'; end if;
+  delete from public.poker_admins where user_id=p_user_id;
+  if not found then raise exception 'That user is not an administrator'; end if;
+  return jsonb_build_object('revoked',true,'user_id',p_user_id);
+end;
+$$;
+
+revoke all on function public.admin_list_users() from public;
+revoke all on function public.admin_assign_role_by_email(text) from public;
+revoke all on function public.admin_revoke_role(uuid) from public;
+grant execute on function public.admin_list_users() to authenticated;
+grant execute on function public.admin_assign_role_by_email(text) to authenticated;
+grant execute on function public.admin_revoke_role(uuid) to authenticated;
