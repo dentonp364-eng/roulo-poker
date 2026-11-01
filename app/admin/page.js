@@ -10,8 +10,15 @@ export default function AdminPage() {
   const [authorized, setAuthorized] = useState(false);
   const [checking, setChecking] = useState(true);
   const [tables, setTables] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
+
+  const loadAdmins = useCallback(async () => {
+    const { data, error } = await supabase.rpc("admin_list_users");
+    if (error) setMessage(error.message); else setPlayers(Array.isArray(data) ? data : []);
+  }, []);
 
   const loadTables = useCallback(async () => {
     const { data, error } = await supabase.rpc("admin_list_poker_tables");
@@ -31,12 +38,12 @@ export default function AdminPage() {
       if (error) setMessage(error.message);
       const allowed = data === true;
       setAuthorized(allowed);
-      if (allowed) await loadTables();
+      if (allowed) { await loadTables(); await loadAdmins(); }
       setChecking(false);
     }
     checkAccess();
     return () => { alive = false; };
-  }, [loadTables]);
+  }, [loadTables, loadAdmins]);
 
   async function runAction(key, rpc, args, success) {
     if (busy) return;
@@ -44,7 +51,17 @@ export default function AdminPage() {
     const { error } = await supabase.rpc(rpc, args);
     setBusy("");
     if (error) setMessage(error.message);
-    else { setMessage(success); await loadTables(); }
+    else { setMessage(success); await loadTables(); await loadAdmins(); }
+  }
+
+  async function assignAdmin(event) {
+    event.preventDefault();
+    if (!email.trim() || busy) return;
+    setBusy("assign"); setMessage("");
+    const { error } = await supabase.rpc("admin_assign_role_by_email", { p_email: email.trim() });
+    setBusy("");
+    if (error) setMessage(error.message);
+    else { setMessage("Admin role assigned."); setEmail(""); await loadAdmins(); }
   }
 
   const totalPlayers = tables.reduce((sum, t) => sum + Number(t.players || 0), 0);
