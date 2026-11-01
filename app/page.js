@@ -31,7 +31,8 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getUser().then(({ data, error }) => {
+    (async () => {
+      const { data, error } = await supabase.auth.getUser();
       if (!mounted) return;
       if (error) setMessage(error.message);
       setUser(data.user);
@@ -43,7 +44,7 @@ export default function Home() {
         setIsAdmin(false);
       }
       setLoading(false);
-    });
+    })();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null;
       setUser(nextUser);
