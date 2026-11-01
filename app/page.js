@@ -224,6 +224,23 @@ export default function Home() {
             </div>
           )}
         </div>
+        <aside className="lobby-aside">
+          <div className="roulo-feature">
+            <div className="feature-cards"><span>A♠</span><span>A♥</span></div>
+            <div className="feature-chip">R</div>
+            <strong>ROULO <b>POKER</b></strong>
+            <small>YOUR TABLE. YOUR GAME.</small>
+          </div>
+          <div className="panel lobby-stats">
+            <div className="section-heading"><h2>Lobby stats</h2><span className="live-label"><i/> LIVE</span></div>
+            <div className="stats-grid">
+              <div><strong>{user ? "1" : "0"}</strong><span>Players online</span></div>
+              <div><strong>{visibleTables.length}</strong><span>Active tables</span></div>
+              <div><strong>0</strong><span>Tournaments</span></div>
+            </div>
+          </div>
+          <div className="panel quick-info"><span className="eyebrow">THE GAME</span><h3>Texas Hold’em</h3><p>Join a table, take a seat and play with virtual chips.</p></div>
+        </aside>
       </section>
       <footer className="site-footer"><span>ROULO POKER</span><span>Texas Hold’em · Virtual play chips only</span></footer>
     </main>
