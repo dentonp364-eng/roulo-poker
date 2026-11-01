@@ -232,3 +232,13 @@ a { color: inherit; text-decoration: none; }
 .table-current-bet{padding-top:5px;border-top:1px solid #9acb4b33;color:#e3f4c7!important}
 @keyframes roulo-turn-pulse{0%,100%{opacity:.45}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.player-seat.is-acting:after{animation:none}}
+
+
+/* Connection and recovery controls */
+.table-connection-bar{max-width:1250px;margin:13px auto 0;display:flex;align-items:center;gap:9px;color:#aab99f;font-size:9px;font-weight:900;letter-spacing:1.2px}
+.connection-dot{width:7px;height:7px;border-radius:50%;background:#e3a35b;box-shadow:0 0 9px #e3a35b88}
+.connection-dot.live{background:#b7ed54;box-shadow:0 0 9px #b7ed54aa}
+.table-connection-bar button{margin-left:auto;padding:7px 10px;border:1px solid #40543a;border-radius:7px;background:#152016;color:#d8e6cf;font-size:9px;font-weight:900;letter-spacing:.8px;cursor:pointer}
+.table-connection-bar button:disabled{opacity:.4;cursor:wait}
+.table-connection-bar small{color:#778672;font-size:9px;letter-spacing:0;font-weight:500}
+@media(max-width:600px){.table-connection-bar{flex-wrap:wrap}.table-connection-bar small{display:none}}
