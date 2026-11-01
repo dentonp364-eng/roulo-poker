@@ -79,6 +79,18 @@ export default function AdminPage() {
       <article><span>OPEN TABLES</span><strong>{activeTables}</strong></article>
       <article><span>PLAYERS SEATED</span><strong>{totalPlayers}</strong></article>
     </section>
+    <section className="admin-panel admin-users-panel">
+      <div className="admin-section-head"><div><span className="admin-kicker">PERMISSIONS</span><h2>Admin role management</h2><p>Promote registered users by email or revoke their access.</p></div></div>
+      <form className="admin-promote-form" onSubmit={assignAdmin}>
+        <label htmlFor="admin-email">Registered player email</label>
+        <div><input id="admin-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="player@example.com" /><button type="submit" disabled={!!busy}>{busy === "assign" ? "Assigning…" : "＋ Assign admin"}</button></div>
+      </form>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>USER</th><th>EMAIL</th><th>ROLE</th><th>ACTION</th></tr></thead><tbody>
+        {players.map(p => <tr key={p.id}><td><strong>{p.display_name || "Poker player"}</strong><small>{p.id.slice(0,8)}…</small></td><td>{p.email || "No email"}</td><td><span className={p.is_admin ? "admin-status-open" : "admin-status-closed"}>{p.is_admin ? "Admin" : "Player"}</span></td><td>{p.is_admin ? <button className="admin-revoke" disabled={!!busy || p.id === user.id} onClick={() => { if (window.confirm("Revoke admin access for "+(p.email || p.display_name)+"?")) runAction("revoke-"+p.id,"admin_revoke_role",{p_user_id:p.id},"Admin role revoked."); }}>Revoke</button> : "—"}</td></tr>)}
+        {players.length === 0 && <tr><td colSpan="4">No registered player accounts found.</td></tr>}
+      </tbody></table></div>
+      <p className="admin-footnote">The first administrator must be added once in Supabase SQL Editor. You cannot revoke your own role from this screen.</p>
+    </section>
     <section className="admin-panel">
       <div className="admin-section-head"><div><span className="admin-kicker">ROOM MANAGEMENT</span><h2>Table management</h2><p>Close games, remove players or permanently delete unwanted tables.</p></div><button className="admin-secondary" disabled={!!busy} onClick={loadTables}>↻ Refresh</button></div>
       {tables.length === 0 ? <div className="admin-empty">No poker tables have been created yet.</div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>TABLE</th><th>BLINDS</th><th>PLAYERS</th><th>TYPE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>
