@@ -30,6 +30,8 @@ export default function PokerTablePage() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [acting, setActing] = useState(false);
+  const [connection, setConnection] = useState("CONNECTING");
+  const [lastSynced, setLastSynced] = useState(null);
 
   const load = useCallback(async () => {
     const [{ data: auth }, { data, error: tableError }] = await Promise.all([
@@ -58,18 +60,40 @@ export default function PokerTablePage() {
       setHand(handData || null);
       setHoleCards(privateCards?.cards || []);
     }
+    setLastSynced(new Date());
     setLoading(false);
   }, [tableId]);
 
   useEffect(() => {
+    let alive = true;
     load();
     const channel = supabase.channel("poker-table-" + tableId)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_seats",filter:"table_id=eq." + tableId}, load)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_tables",filter:"id=eq." + tableId}, load)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_hand_state",filter:"table_id=eq." + tableId}, load)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_hole_cards",filter:"table_id=eq." + tableId}, load)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        if (!alive) return;
+        setConnection(status === "SUBSCRIBED" ? "LIVE" : status === "CHANNEL_ERROR" || status === "TIMED_OUT" ? "RECONNECTING" : "CONNECTING");
+        if (status === "SUBSCRIBED") load();
+      });
+
+    const refreshWhenActive = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const refreshTimer = window.setInterval(refreshWhenActive, 10000);
+    window.addEventListener("focus", refreshWhenActive);
+    window.addEventListener("online", refreshWhenActive);
+    document.addEventListener("visibilitychange", refreshWhenActive);
+
+    return () => {
+      alive = false;
+      window.clearInterval(refreshTimer);
+      window.removeEventListener("focus", refreshWhenActive);
+      window.removeEventListener("online", refreshWhenActive);
+      document.removeEventListener("visibilitychange", refreshWhenActive);
+      supabase.removeChannel(channel);
+    };
   }, [load, tableId]);
 
   async function takeAction(action, amount = 0) {
@@ -118,6 +142,7 @@ export default function PokerTablePage() {
       <button className="table-back" onClick={()=>router.push("/")}>← BACK TO LOBBY</button>
     </header>
     {error && <p className="table-error" role="alert">{error}</p>}
+    <div className="table-connection-bar"><span className={connection === "LIVE" ? "connection-dot live" : "connection-dot"} />{connection === "LIVE" ? "LIVE SYNC" : connection === "RECONNECTING" ? "RECONNECTING…" : "CONNECTING…"}<button onClick={load} disabled={loading || acting || starting}>REFRESH TABLE</button>{lastSynced && <small>Synced {lastSynced.toLocaleTimeString()}</small>}</div>
     <section className="table-stage">
       <div className="felt-table">
         <div className="felt-watermark">ROULO <b>POKER</b></div>
