@@ -8,7 +8,7 @@ const SUITS = { c: "♣", d: "♦", h: "♥", s: "♠" };
 const RED_SUITS = new Set(["d", "h"]);
 
 function PlayingCard({ card, faceDown = false }) {
-  if (faceDown || !card) return <div className="playing-card-back"><img src="/roulo-mark.svg" alt="" /></div>;
+  if (faceDown || !card) return <div className="playing-card-back"><img src="/roulo-mark.png" alt="" /></div>;
   const rank = card.slice(0, -1);
   const suit = card.slice(-1);
   return <div className={`playing-card-face ${RED_SUITS.has(suit) ? "red-card" : ""}`}>
@@ -137,7 +137,7 @@ export default function PokerTablePage() {
 
   return <main className="poker-shell">
     <header className="poker-topbar">
-      <a href="/" className="poker-brand"><img src="/roulo-logo.svg" alt="Roulo Poker" /></a>
+      <a href="/" className="poker-brand"><img src="/roulo-logo.png" alt="Roulo" /><small>POKER</small></a>
       <div className="table-heading"><span className="table-kicker">TEXAS HOLD’EM</span><h1>{table.name}</h1><p>{table.small_blind}/{table.big_blind} blinds <i/> {players.length}/{table.max_players} seated</p></div>
       <button className="table-back" onClick={()=>router.push("/")}>← BACK TO LOBBY</button>
     </header>
