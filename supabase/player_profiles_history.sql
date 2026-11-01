@@ -212,7 +212,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists poker_archive_completed_hand on public.poker_hand_state;
 create trigger poker_archive_completed_hand
@@ -335,7 +335,6 @@ $$;
 revoke all on function public.get_my_poker_hand_history(integer) from public;
 grant execute on function public.get_my_poker_hand_history(integer) to authenticated;
 
-
 -- Admin-only aggregate player performance and recent game history.
 create or replace function public.admin_list_player_stats()
 returns jsonb
@@ -421,7 +420,6 @@ revoke all on function public.admin_list_player_stats() from public;
 revoke all on function public.admin_list_recent_hands(integer) from public;
 grant execute on function public.admin_list_player_stats() to authenticated;
 grant execute on function public.admin_list_recent_hands(integer) to authenticated;
-
 
 -- Ensure the hand state persists the final folded seats before the archive trigger runs.
 -- The existing poker action RPC returned early in fold-out/all-in branches before its
