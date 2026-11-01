@@ -126,6 +126,7 @@ export default function Home() {
   const displayName = user?.user_metadata?.full_name ||
     user?.user_metadata?.name || "Discord player";
   const visibleTables = tables.filter(t => !t.is_private || t.owner_id === user?.id);
+  const seatedPlayers = visibleTables.reduce((total, table) => total + (table.poker_seats?.length || 0), 0);
 
   return (
     <main className="lobby-page">
@@ -234,7 +235,7 @@ export default function Home() {
           <div className="panel lobby-stats">
             <div className="section-heading"><h2>Lobby stats</h2><span className="live-label"><i/> LIVE</span></div>
             <div className="stats-grid">
-              <div><strong>{user ? "1" : "0"}</strong><span>Players online</span></div>
+              <div><strong>{seatedPlayers}</strong><span>Players seated</span></div>
               <div><strong>{visibleTables.length}</strong><span>Active tables</span></div>
               <div><strong>0</strong><span>Tournaments</span></div>
             </div>
