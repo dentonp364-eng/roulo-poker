@@ -1,4 +1,4 @@
--- Trashguy Poker lobby RPCs
+-- Roulo Poker lobby RPCs
 -- Run this file in Supabase SQL Editor after the initial table setup.
 
 alter table public.poker_tables
