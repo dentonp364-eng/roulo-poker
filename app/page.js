@@ -221,7 +221,6 @@ export default function Home() {
               </div>}
           </div>
           <button onClick={loadTables} style={{...button("#34443a"), marginTop:18}}>REFRESH LOBBY</button>
-        </>}
       </section>
       <footer style={{textAlign:"center", color:"#718477", marginTop:28}}>TRASHGUY POKER · VIRTUAL PLAY CHIPS ONLY</footer>
     </main>
