@@ -201,3 +201,18 @@ a { color: inherit; text-decoration: none; }
 .admin-promote-form button:disabled,.admin-revoke:disabled{opacity:.45;cursor:not-allowed}
 .admin-revoke{border-color:#703b35;background:#321a18;color:#ffaaa0}
 @media(max-width:520px){.admin-promote-form>div{flex-direction:column}.admin-promote-form button{align-self:flex-start}}
+
+
+/* Live hand cards and deal control */
+.playing-card-face,.playing-card-back{width:54px;height:78px;border-radius:8px;box-shadow:0 7px 16px #0008;flex:0 0 auto}
+.playing-card-face{position:relative;padding:7px;background:linear-gradient(145deg,#fff,#e7ece3);color:#172016;display:flex;flex-direction:column;justify-content:space-between;font-size:18px;font-weight:950}
+.playing-card-face span{align-self:center;font-size:25px;line-height:1}
+.playing-card-face small{align-self:flex-end;font-size:15px}
+.playing-card-face.red-card{color:#c43b36}
+.playing-card-back{display:grid;place-items:center;border:2px solid #b7ed54;background:repeating-linear-gradient(45deg,#142b1a,#142b1a 5px,#203d26 5px,#203d26 10px);color:#c5ed77}
+.playing-card-back b{font-size:25px;font-style:italic}
+.community-cards .playing-card-face,.community-cards .playing-card-back{width:53px;height:77px}
+.start-hand-button{padding:12px 19px;border:1px solid #d5fa91;border-radius:9px;background:linear-gradient(180deg,#c8f875,#a5d943);color:#10170c;font-size:10px;font-weight:950;letter-spacing:1px;box-shadow:0 5px 18px #9fd74730;cursor:pointer}
+.start-hand-button:disabled{opacity:.55;cursor:wait}
+.table-error{max-width:1250px;margin:16px auto 0;padding:11px 14px;border:1px solid #81453c;border-radius:9px;background:#291713;color:#ffc0b4;font-size:12px}
+@media(max-width:800px){.playing-card-face,.playing-card-back{width:42px;height:61px;font-size:15px}.playing-card-face span{font-size:19px}.playing-card-face small{font-size:12px}.community-cards .playing-card-face,.community-cards .playing-card-back{width:37px;height:54px}.start-hand-button{padding:10px 13px;font-size:9px}}
