@@ -155,7 +155,7 @@ export default function PokerTablePage() {
         </div>
         {seats.map((player,i)=><div className={`player-seat seat-${i+1} ${player?"occupied":""} ${actingSeat===i+1?"is-acting":""}`} key={i}>
           <div className="seat-avatar">{player?.profile?.avatar_url?<img src={player.profile.avatar_url} alt="" />:<span>{player?"♠":"+"}</span>}</div>
-          <div className="seat-copy"><small>SEAT {i+1} {dealerSeat===i+1 ? " · DEALER" : ""}</small><strong>{player?.profile?.discord_name || "EMPTY SEAT"}</strong><span>{player?Number(player.chips).toLocaleString()+" chips":"Waiting for player"}</span>{actingSeat===i+1 && <em className="turn-pill">TO ACT</em>}</div>
+          <div className="seat-copy"><small>SEAT {i+1} {dealerSeat===i+1 ? " · DEALER" : ""}</small>{player ? <a className="seat-profile-link" href={"/profile/" + player.player_id}>{player.profile?.discord_name || "Poker player"}</a> : <strong>EMPTY SEAT</strong>}<span>{player?Number(player.chips).toLocaleString()+" chips":"Waiting for player"}</span>{actingSeat===i+1 && <em className="turn-pill">TO ACT</em>}</div>
         </div>)}
       </div>
     </section>
