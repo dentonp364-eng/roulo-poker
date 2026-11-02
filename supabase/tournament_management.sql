@@ -710,7 +710,7 @@ as $
     where e.tournament_id=t.id)
   ) order by t.completed_at desc nulls last),'[]'::jsonb)
   from public.poker_tournaments t
-  where t.status='completed';
-$;
+  where t.status='completed';$
+;
 revoke all on function public.list_poker_tournament_results() from public;
 grant execute on function public.list_poker_tournament_results() to authenticated;
