@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 export default function TournamentsPage() {
   const [user,setUser]=useState(null);
   const [items,setItems]=useState([]);
+  const itemsRef=useRef([]);
   const [name,setName]=useState("Friday Night Tournament");
   const [tableCount,setTableCount]=useState(2);
   const [seats,setSeats]=useState(9);
@@ -19,7 +20,7 @@ export default function TournamentsPage() {
   const load=useCallback(async()=>{
     const {data,error}=await supabase.rpc("list_poker_tournaments");
     if(error) setMessage(error.message);
-    else setItems(Array.isArray(data)?data:[]);
+    else { const next=Array.isArray(data)?data:[]; itemsRef.current=next; setItems(next); }
   },[]);
 
   useEffect(()=>{
@@ -32,7 +33,7 @@ export default function TournamentsPage() {
   useEffect(()=>{
     if(!user)return;
     const syncRunning=async()=>{
-      const running=items.filter(t=>t.status==="running" && t.my_table_id);
+      const running=itemsRef.current.filter(t=>t.status==="running" && t.my_table_id);
       if(!running.length)return;
       await Promise.all(running.map(t=>supabase.rpc("advance_poker_tournament_blinds",{p_tournament_id:t.id})));
       await load();
@@ -40,7 +41,7 @@ export default function TournamentsPage() {
     syncRunning();
     const timer=window.setInterval(syncRunning,30000);
     return ()=>window.clearInterval(timer);
-  },[items,user,load]);
+  },[user,load]);
 
   async function createTournament(e){
     e.preventDefault();
