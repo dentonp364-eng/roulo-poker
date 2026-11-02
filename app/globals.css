@@ -432,3 +432,8 @@ a { color: inherit; text-decoration: none; }
 .tournament-table-list span{padding:7px 9px;border:1px solid #344333;border-radius:7px}
 .tournament-join{width:100%;justify-content:center}
 @media(max-width:850px){.tournament-layout{grid-template-columns:1fr}.tournament-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+.admin-action-group{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.admin-delete{white-space:nowrap}
+@media(max-width:700px){.admin-action-group{align-items:stretch}.admin-action-group button{width:100%}}
