@@ -24,7 +24,7 @@ export default function PlayerProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(null);\n  const [tournamentStats, setTournamentStats] = useState(null);
   const [hands, setHands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,7 +70,7 @@ export default function PlayerProfilePage() {
   const winRate = Number(stats?.win_rate || 0);
 
   return <main className="profile-shell">
-    <header className="profile-topbar"><a className="profile-brand" href="/">ROULO <b>POKER</b></a><div><a href="/history">Hand history</a><button className="profile-back" onClick={() => router.push("/")}>← Lobby</button></div></header>
+    <header className="profile-topbar"><a className="profile-brand" href="/">ROULO <b>POKER</b></a><div><a href="/tournament-leaderboard">Tournament rankings</a><a href="/history">Hand history</a><button className="profile-back" onClick={() => router.push("/")}>← Lobby</button></div></header>
     {message && <p className="profile-message" role="status">{message}</p>}
     <section className="profile-hero">
       <div className="profile-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : <span>♠</span>}</div>
@@ -90,6 +90,17 @@ export default function PlayerProfilePage() {
       <article><span>BIGGEST POT WON</span><strong>{Number(stats?.biggest_pot || 0).toLocaleString()}</strong></article>
       <article><span>TOTAL CHIPS WON</span><strong>{Number(stats?.total_chips_won || 0).toLocaleString()}</strong></article>
       <article><span>NET CHIP RESULT</span><strong className={Number(stats?.net_chips || 0) >= 0 ? "result-positive" : "result-negative"}>{Number(stats?.net_chips || 0) > 0 ? "+" : ""}{Number(stats?.net_chips || 0).toLocaleString()}</strong></article>
+    </section>
+    <section className="profile-history-section">
+      <div className="profile-section-heading"><div><span className="profile-kicker">TOURNAMENT PERFORMANCE</span><h2>Tournament statistics</h2></div><a href="/tournament-leaderboard">View rankings →</a></div>
+      <div className="profile-stats-grid">
+        <article><span>EVENTS ENTERED</span><strong>{Number(tournamentStats?.tournaments_entered||0)}</strong></article>
+        <article><span>EVENTS COMPLETED</span><strong>{Number(tournamentStats?.tournaments_completed||0)}</strong></article>
+        <article><span>TOURNAMENT WINS</span><strong>{Number(tournamentStats?.wins||0)}</strong></article>
+        <article><span>TOP THREE FINISHES</span><strong>{Number(tournamentStats?.top_three||0)}</strong></article>
+        <article><span>BEST FINISH</span><strong>{tournamentStats?.best_finish?("#"+tournamentStats.best_finish):"—"}</strong></article>
+        <article><span>RANKING POINTS</span><strong>{Number(tournamentStats?.points||0).toLocaleString()}</strong></article>
+      </div>
     </section>
     <section className="profile-history-section"><div className="profile-section-heading"><div><span className="profile-kicker">RECENT RESULTS</span><h2>Hand history</h2></div>{ownProfile && <a href="/history">View all hands →</a>}</div>
       {hands.length ? <div className="history-list">{hands.map(hand => <Result key={hand.id} hand={hand} />)}</div> : <div className="profile-empty">No completed hands recorded yet. Your results will appear here after your next finished hand.</div>}
