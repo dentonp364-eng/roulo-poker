@@ -116,7 +116,16 @@ export default function TournamentsPage() {
           <div className="tournament-cards">{items.map(t=><article className="tournament-card" key={t.id}>
             <div className="tournament-card-head"><div><span className="eyebrow">{t.status==="registration"?"REGISTRATION OPEN":"IN PROGRESS"}</span><h3>{t.name}</h3></div><span className="tournament-status">{t.status==="registration"?"OPEN":"LIVE"}</span></div>
             <div className="tournament-stats"><div><strong>{t.players}/{t.capacity}</strong><span>PLAYERS</span></div><div><strong>{t.table_count}</strong><span>TABLES</span></div><div><strong>{Number(t.starting_chips).toLocaleString()}</strong><span>STARTING CHIPS</span></div><div><strong>{t.status==="running"?Number(t.small_blind*Math.pow(2,Math.max(0,(t.blind_level||1)-1))).toLocaleString()+"/"+Number(t.big_blind*Math.pow(2,Math.max(0,(t.blind_level||1)-1))).toLocaleString():t.small_blind+"/"+t.big_blind}</strong><span>{t.status==="running"?"LEVEL "+(t.blind_level||1):"STARTING BLINDS"}</span></div></div>
-            <div className="tournament-table-list">{(t.tables||[]).map(tb=><span key={tb.table_id}>TABLE {tb.table_number} · {tb.seated}/{tb.max_players}</span>)}</div>
+            <div className="tournament-table-list">{(t.tables||[]).map(tb=><span key={tb.table_id}>{tb.is_final_table?"FINAL TABLE":`TABLE ${tb.table_number}`} · {tb.seated}/{tb.max_players}</span>)}</div>
+            <section className="tournament-leaderboard">
+              <div className="eyebrow">TOURNAMENT LEADERBOARD</div>
+              {(t.leaderboard||[]).length===0?<p className="panel-footnote">No players registered yet.</p>:
+                <ol>{(t.leaderboard||[]).map((p,i)=><li key={p.player_id} className={p.finish_position===1?"leaderboard-winner":""}>
+                  <span className="leaderboard-rank">{p.finish_position? `#${p.finish_position}` : `#${i+1}`}</span>
+                  <span className="leaderboard-name">{p.display_name}{p.eliminated_at?" · OUT":""}</span>
+                  <strong>{p.eliminated_at?`Finished ${p.finish_position||"—"}`:`${Number(p.chips||0).toLocaleString()} chips`}</strong>
+                </li>)}</ol>}
+            </section>
             {t.status==="registration"&&user?.id===t.owner_id&&<button className="button button-quiet tournament-join" disabled={busy||t.players<2} onClick={()=>startTournament(t)}>{busy?"Starting…":"START TOURNAMENT"} →</button>}
             <button className="button button-primary tournament-join" disabled={busy||(!t.my_table_id&&(t.status!=="registration"||t.players>=t.capacity))} onClick={()=>register(t)}>{t.my_table_id?"OPEN MY TABLE":t.players>=t.capacity?"Tournament full":t.status!=="registration"?"Registration closed":"REGISTER FOR TOURNAMENT"} →</button>
           </article>)}</div>}
