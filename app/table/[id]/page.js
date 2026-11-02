@@ -94,6 +94,21 @@ export default function PokerTablePage() {
         setLoading(false);
         return;
       }
+      // The anonymous test session joins the poker table, then the admin
+      // session records it as a tournament entrant when this is a tournament table.
+      const testUserId = sessionData?.session?.user?.id || (await testClient.auth.getUser()).data?.user?.id;
+      if (testUserId) {
+        const { error: tournamentEntryError } = await supabase.rpc("admin_register_tournament_test_player", {
+          p_table_id: tableId,
+          p_player_id: testUserId
+        });
+        if (tournamentEntryError) {
+          setError(tournamentEntryError.message);
+          setTestSetupBusy(false);
+          setLoading(false);
+          return;
+        }
+      }
       setTestSetupBusy(false);
       setTestPlayerReady(true);
       await load();
