@@ -71,8 +71,7 @@ begin
 
   for i in 1..p_table_count loop
     insert into public.poker_tables(name,owner_id,small_blind,big_blind,max_players,is_private,status,invite_code)
-    values(v_name || ' · Table ' || i,v_user,p_small_blind,p_big_blind,p_players_per_table,true,'waiting',
-      upper(substr(replace(gen_random_uuid()::text,'-',''),1,8)))
+    values(v_name || ' · Table ' || i,v_user,p_small_blind,p_big_blind,p_players_per_table,false,'waiting',null)
     returning * into v_table;
     insert into public.poker_tournament_tables(tournament_id,table_id,table_number)
     values(v_tournament.id,v_table.id,i);
@@ -165,3 +164,9 @@ revoke all on function public.register_poker_tournament(uuid) from public;
 grant execute on function public.create_poker_tournament(text,integer,integer,bigint,bigint,bigint,integer) to authenticated;
 grant execute on function public.list_poker_tournaments() to authenticated;
 grant execute on function public.register_poker_tournament(uuid) to authenticated;
+
+
+-- Make already-created tournament tables public too, so no invite code is needed.
+update public.poker_tables t
+set is_private = false, invite_code = null
+where t.id in (select table_id from public.poker_tournament_tables);
