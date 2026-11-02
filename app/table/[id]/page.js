@@ -167,7 +167,7 @@ export default function PokerTablePage() {
       <div className="action-panel">
         <button disabled={!myTurn || acting} onClick={() => takeAction("fold")}>FOLD</button>
         <button className="action-primary" disabled={!myTurn || acting} onClick={() => takeAction(toCall > 0 ? "call" : "check")}>{toCall > 0 ? `CALL ${toCall.toLocaleString()}` : "CHECK"}</button>
-        <button disabled={!myTurn || acting || Number(mySeat?.chips || 0) <= toCall} onClick={() => takeAction(hand?.current_bet > 0 ? "raise" : "bet", Number(hand?.current_bet || 0) + Number(table.big_blind))}>{hand?.current_bet > 0 ? "RAISE" : "BET"} {Number(table.big_blind).toLocaleString()}</button>
+        <button disabled={!myTurn || acting || Number(mySeat?.chips || 0) <= toCall} onClick={() => takeAction(hand?.current_bet > 0 ? "raise" : "bet", Number(hand?.current_bet || 0) + Math.max(Number(hand?.last_raise_size || 0), Number(table.big_blind)))}>{hand?.current_bet > 0 ? "RAISE" : "BET"} {Number(table.big_blind).toLocaleString()}</button>
       </div>
     </section>
     <p className="prototype-note">{isSeated ? `Your seat: ${mySeat?.seat_number} · ` : "Join this table from the lobby to play · "}{myTurn ? "It's your turn · " : ""}Cards are dealt privately to each player · Virtual chips only</p>
