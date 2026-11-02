@@ -33,7 +33,9 @@ export default function Home() {
     let mounted = true;
     supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return;
-      if (error) setMessage(error.message);
+      // No stored Supabase session is a normal signed-out state, not an error banner.
+      if (error && error.name !== "AuthSessionMissingError") setMessage(error.message);
+      else if (!data?.user) setMessage("");
       const nextUser = data?.user ?? null;
       setUser(nextUser);
       if (!nextUser) {
