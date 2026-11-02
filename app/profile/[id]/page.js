@@ -73,7 +73,7 @@ export default function PlayerProfilePage() {
   const winRate = Number(stats?.win_rate || 0);
 
   return <main className="profile-shell">
-    <header className="profile-topbar"><a className="profile-brand" href="/">ROULO <b>POKER</b></a><div><a href="/tournament-leaderboard">Tournament rankings</a><a href="/history">Hand history</a><button className="profile-back" onClick={() => router.push("/")}>← Lobby</button></div></header>
+    <header className="profile-topbar"><a className="profile-brand" href="/">ROULO <b>POKER</b></a><div><a href="/tournament-leaderboard">Tournament rankings</a><a href="/tournament-history">Tournament history</a><a href="/history">Hand history</a><button className="profile-back" onClick={() => router.push("/")}>← Lobby</button></div></header>
     {message && <p className="profile-message" role="status">{message}</p>}
     <section className="profile-hero">
       <div className="profile-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : <span>♠</span>}</div>
