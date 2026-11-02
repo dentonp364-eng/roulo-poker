@@ -195,3 +195,56 @@ end;
 $$;
 revoke all on function public.register_poker_tournament(uuid) from public;
 grant execute on function public.register_poker_tournament(uuid) to authenticated;
+
+-- Admin-only bridge for the temporary test-player flow. A test player joins
+-- the poker table using its own anonymous session; the admin session then
+-- records that seated player in the matching tournament.
+create or replace function public.admin_register_tournament_test_player(p_table_id uuid,p_player_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tournament_id uuid;
+  v_seat integer;
+  v_chips bigint;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+
+  if not exists (
+    select 1 from auth.users u
+    where u.id=p_player_id
+      and coalesce(u.is_anonymous,false)=true
+      and coalesce(u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','')='Roulo Test Player'
+  ) then
+    raise exception 'Player is not a recognized temporary test player';
+  end if;
+
+  select pt.tournament_id into v_tournament_id
+  from public.poker_tournament_tables pt
+  where pt.table_id=p_table_id
+  limit 1;
+
+  if v_tournament_id is null then
+    return jsonb_build_object('registered',false,'tournament_table',false);
+  end if;
+
+  select s.seat_number,s.chips into v_seat,v_chips
+  from public.poker_seats s
+  where s.table_id=p_table_id and s.player_id=p_player_id;
+
+  if v_seat is null then raise exception 'Temporary test player is not seated at this tournament table'; end if;
+
+  insert into public.poker_tournament_entries(tournament_id,player_id,table_id,seat_number)
+  values(v_tournament_id,p_player_id,p_table_id,v_seat)
+  on conflict(tournament_id,player_id) do update
+    set table_id=excluded.table_id,seat_number=excluded.seat_number;
+
+  return jsonb_build_object('registered',true,'tournament_id',v_tournament_id,
+    'table_id',p_table_id,'seat_number',v_seat,'chips',v_chips);
+end;
+$$;
+
+revoke all on function public.admin_register_tournament_test_player(uuid,uuid) from public;
+grant execute on function public.admin_register_tournament_test_player(uuid,uuid) to authenticated;
