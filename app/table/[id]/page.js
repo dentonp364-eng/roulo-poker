@@ -37,6 +37,7 @@ export default function PokerTablePage() {
   const [testModeChecked, setTestModeChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [testSetupBusy, setTestSetupBusy] = useState(false);
+  const [testPlayerReady, setTestPlayerReady] = useState(false);
 
   const testClient = useMemo(() => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -92,6 +93,7 @@ export default function PokerTablePage() {
         return;
       }
       setTestSetupBusy(false);
+      setTestPlayerReady(true);
       await load();
     }
     prepareTestPlayer();
@@ -130,7 +132,7 @@ export default function PokerTablePage() {
   }, [tableId, db]);
 
   useEffect(() => {
-    if (!testModeChecked || (testPlayerMode && testSetupBusy)) return;
+    if (!testModeChecked || (testPlayerMode && (!testPlayerReady || testSetupBusy))) return;
     let alive = true;
     load();
     const channel = db.channel("poker-table-" + tableId)
@@ -160,7 +162,7 @@ export default function PokerTablePage() {
       document.removeEventListener("visibilitychange", refreshWhenActive);
       db.removeChannel(channel);
     };
-  }, [load, tableId, db, testModeChecked, testPlayerMode, testSetupBusy]);
+  }, [load, tableId, db, testModeChecked, testPlayerMode, testPlayerReady, testSetupBusy]);
 
   async function takeAction(action, amount = 0) {
     if (acting) return;
@@ -212,7 +214,7 @@ export default function PokerTablePage() {
       <button className="table-back" onClick={()=>router.push("/")}>← BACK TO LOBBY</button>
     </header>
     {error && <p className="table-error" role="alert">{error}</p>}
-    {testPlayerMode && <div className="table-error">TEMPORARY TEST PLAYER · Separate anonymous session <button onClick={async()=>{const {data:{user:testUser}}=await testClient.auth.getUser();if(testUser){const {error:removeError}=await supabase.rpc("admin_remove_poker_player",{p_table_id:tableId,p_player_id:testUser.id});if(removeError){setError(removeError.message);return;}}await testClient.auth.signOut();window.location.href="/table/"+tableId;}}>REMOVE TEST PLAYER</button></div>}
+    {testPlayerMode && <div className="table-error">TEMPORARY TEST PLAYER · Separate anonymous session <button onClick={async()=>{const {data:{user:testUser}}=await testClient.auth.getUser();if(testUser){if(hand && !["waiting","showdown"].includes(hand.phase)){setError("Finish the current hand before removing the test player.");return;}const {error:removeError}=await supabase.rpc("admin_remove_poker_player",{p_table_id:tableId,p_player_id:testUser.id});if(removeError){setError(removeError.message);return;}}await testClient.auth.signOut();window.location.href="/table/"+tableId;}}>REMOVE TEST PLAYER</button></div>}
     {!testPlayerMode && isAdmin && <div className="table-connection-bar"><span>ADMIN TESTING</span><button onClick={()=>window.open("/table/"+tableId+"?testPlayer=1","_blank","noopener,noreferrer")}>＋ ADD TEMPORARY TEST PLAYER</button></div>}
     <div className="table-connection-bar"><span className={connection === "LIVE" ? "connection-dot live" : "connection-dot"} />{connection === "LIVE" ? "LIVE SYNC" : connection === "RECONNECTING" ? "RECONNECTING…" : "CONNECTING…"}<button onClick={load} disabled={loading || acting || starting}>REFRESH TABLE</button>{lastSynced && <small>Synced {lastSynced.toLocaleTimeString()}</small>}</div>
     <section className="table-stage">
