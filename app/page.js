@@ -263,7 +263,7 @@ export default function Home() {
         <aside className="lobby-aside">
           <div className="roulo-feature">
             <div className="feature-cards"><span>A♠</span><span>A♥</span></div>
-            <div className="feature-chip"><img src="/roulo-logo.png?v=4" alt="Roulo emblem" /></div>
+            <div className="feature-chip"><img src="/roulo-logo.png" alt="Roulo emblem" /></div>
             <strong>ROULO <b>POKER</b></strong>
             <small>YOUR TABLE. YOUR GAME.</small>
           </div>
