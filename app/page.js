@@ -170,6 +170,7 @@ export default function Home() {
         </a>
         <nav className="main-nav" aria-label="Main navigation">
           <a className="nav-active" href="/">Poker lobby</a>
+          <a href="/tournaments">Tournaments</a>
           <a href="/history">Hand history</a>
           {user && <a href={"/profile/" + user.id}>My profile</a>}
           {user && isAdmin && <a href="/admin">Admin</a>}
