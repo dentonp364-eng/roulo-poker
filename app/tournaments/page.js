@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 export default function TournamentsPage() {
   const [user,setUser]=useState(null);
   const [items,setItems]=useState([]);
+  const [results,setResults]=useState([]);
   const itemsRef=useRef([]);
   const [name,setName]=useState("Friday Night Tournament");
   const [tableCount,setTableCount]=useState(2);
@@ -23,12 +24,19 @@ export default function TournamentsPage() {
     else { const next=Array.isArray(data)?data:[]; itemsRef.current=next; setItems(next); }
   },[]);
 
+  const loadResults=useCallback(async()=>{
+    const {data,error}=await supabase.rpc("list_poker_tournament_results");
+    if(error) setMessage(error.message);
+    else setResults(Array.isArray(data)?data:[]);
+  },[]);
+
   useEffect(()=>{
     let alive=true;
     supabase.auth.getUser().then(({data})=>{if(alive)setUser(data.user||null);});
     load();
+    loadResults();
     return ()=>{alive=false;};
-  },[load]);
+  },[load,loadResults]);
 
   useEffect(()=>{
     if(!user)return;
@@ -131,6 +139,14 @@ export default function TournamentsPage() {
           </article>)}</div>}
       </div>
     </section>
-    <footer className="site-footer"><span>ROULO POKER</span><span>Multi-table tournaments · Virtual play chips only</span></footer>
+        <section className="panel tournament-results">
+      <div className="section-heading"><div><span className="eyebrow">PAST EVENTS</span><h2>Tournament results</h2></div><button className="button button-quiet" onClick={loadResults}>↻ Refresh</button></div>
+      {results.length===0?<div className="empty-state"><div className="empty-symbol">♠</div><strong>No completed tournaments yet</strong><p>Finished events will be saved here with their final finishing positions.</p></div>:
+        <div className="tournament-result-list">{results.map(t=><article className="tournament-result-card" key={t.id}>
+          <div className="tournament-result-head"><div><h3>{t.name}</h3><span>{t.completed_at?new Date(t.completed_at).toLocaleString():"Completed"}</span></div><strong>{t.players} PLAYERS</strong></div>
+          <ol>{(t.leaderboard||[]).map(p=><li key={p.player_id}><span>{p.finish_position===1?"🏆":"#"+(p.finish_position||"—")}</span><strong>{p.display_name}</strong>{p.finish_position===1&&<em>WINNER</em>}</li>)}</ol>
+        </article>)}</div>}
+    </section>
+<footer className="site-footer"><span>ROULO POKER</span><span>Multi-table tournaments · Virtual play chips only</span></footer>
   </main>;
 }
