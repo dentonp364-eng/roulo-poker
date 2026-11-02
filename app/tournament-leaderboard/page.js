@@ -15,7 +15,7 @@ export default function TournamentLeaderboardPage() {
   },[]);
   useEffect(()=>{load();},[load]);
   return <main className="profile-shell tournament-ranking-shell">
-    <header className="profile-topbar"><a className="profile-brand" href="/"><img src="/roulo-logo.png" alt="Roulo" style={{width:126,height:44,objectFit:"contain"}}/><b>POKER</b></a><div><a href="/tournaments">Tournaments</a><a href="/history">Hand history</a><a href="/">Lobby</a></div></header>
+    <header className="profile-topbar"><a className="profile-brand" href="/"><img src="/roulo-logo.png" alt="Roulo" style={{width:126,height:44,objectFit:"contain"}}/><b>POKER</b></a><div><a href="/tournaments">Tournaments</a><a href="/tournament-history">Tournament history</a><a href="/history">Hand history</a><a href="/">Lobby</a></div></header>
     <section className="profile-page-heading"><span className="profile-kicker">THE COMPETITIVE CIRCUIT</span><h1>Tournament rankings</h1><p>Lifetime tournament performance, kept separate from cash-game statistics.</p></section>
     <section className="profile-history-section">
       <div className="profile-section-heading"><div><span className="profile-kicker">GLOBAL STANDINGS</span><h2>Player leaderboard</h2></div><button className="profile-back" onClick={load}>↻ Refresh</button></div>
