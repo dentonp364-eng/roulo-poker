@@ -318,7 +318,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_level bigint;
   v_previous bigint := 0;
@@ -398,7 +398,7 @@ begin
 
   return jsonb_build_object('pot_awarded',v_total_awarded,'side_pots',v_layers);
 end;
-$;
+$$;
 
 revoke all on function public.poker_settle_side_pots(uuid,integer,jsonb,jsonb,jsonb) from public;
 
