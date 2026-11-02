@@ -513,3 +513,59 @@ a { color: inherit; text-decoration: none; }
  .tournament-record-player span:nth-of-type(2),.tournament-record-player b { display:none; }
  .tournament-record-heading h3 { font-size:16px; }
 }
+
+/* Strong, explicit layout for tournament history summary metrics */
+main.profile-shell.tournament-history-shell .tournament-record-summary {
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  gap:14px !important;
+  margin:26px 0 30px !important;
+}
+main.profile-shell.tournament-history-shell .tournament-record-summary article {
+  min-width:0;
+  min-height:112px;
+  padding:18px 20px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:flex-start !important;
+  justify-content:center !important;
+  gap:7px !important;
+  border:1px solid #344331 !important;
+  border-radius:13px !important;
+  background:linear-gradient(145deg,#192319,#101610) !important;
+}
+main.profile-shell.tournament-history-shell .record-metric-label {
+  display:block;
+  color:#aab7a2 !important;
+  font-size:10px !important;
+  line-height:1.4;
+  font-weight:800;
+  letter-spacing:.65px;
+  text-transform:uppercase;
+}
+main.profile-shell.tournament-history-shell .record-metric-value {
+  display:block;
+  color:#e7f4d8 !important;
+  font-size:32px !important;
+  line-height:1.05;
+  font-weight:900 !important;
+  font-variant-numeric:tabular-nums;
+}
+main.profile-shell.tournament-history-shell .tournament-record-summary article small {
+  color:#7f8d78;
+  font-size:10px;
+  line-height:1.4;
+}
+main.profile-shell.tournament-history-shell .tournament-record-heading h3 { line-height:1.25; }
+main.profile-shell.tournament-history-shell .tournament-record-standings li { min-height:43px; }
+@media(max-width:700px) {
+  main.profile-shell.tournament-history-shell .tournament-record-summary {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:9px !important;
+  }
+  main.profile-shell.tournament-history-shell .tournament-record-summary article {
+    min-height:100px;
+    padding:14px !important;
+  }
+  main.profile-shell.tournament-history-shell .record-metric-value { font-size:27px !important; }
+}
