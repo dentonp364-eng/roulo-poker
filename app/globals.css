@@ -462,3 +462,18 @@ a { color: inherit; text-decoration: none; }
 .tournament-result-card li>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tournament-result-card li em{color:#e8c86e;font-size:8px;font-style:normal;font-weight:950;letter-spacing:1px}
 @media(max-width:800px){.tournament-result-list{grid-template-columns:1fr}.tournament-results{margin:0 12px 28px;padding:16px}}
+
+
+/* Tournament ranking table */
+.tournament-ranking-table-wrap{overflow-x:auto;border:1px solid #2d3a2c;border-radius:12px;background:#101610}
+.tournament-ranking-table{width:100%;border-collapse:collapse;min-width:650px;text-align:left}
+.tournament-ranking-table th{padding:13px 14px;color:#93a38a;background:#151e16;font-size:9px;letter-spacing:1px}
+.tournament-ranking-table td{padding:14px;border-top:1px solid #29352a;color:#dce7d5;font-size:12px;white-space:nowrap}
+.tournament-ranking-table td:first-child{color:#a8bd8f;font-weight:900}
+.tournament-ranking-table td a{color:#f0f5eb;text-decoration:none;font-weight:850}
+.tournament-ranking-table td a:hover{color:#c5f37d;text-decoration:underline}
+.tournament-ranking-table td strong{color:#c5f37d}
+.tournament-ranking-table tr.ranking-first{background:#b7ed540b}
+.tournament-points-note{margin-top:14px;font-size:10px}
+.tournament-ranking-shell .profile-topbar>div{gap:16px}
+@media(max-width:600px){.tournament-ranking-shell .profile-topbar>div{gap:8px;flex-wrap:wrap}.tournament-ranking-shell .profile-topbar>div>a{font-size:10px}}
