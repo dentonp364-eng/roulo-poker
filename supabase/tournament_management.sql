@@ -508,3 +508,182 @@ alter table public.poker_tournament_entries
 create unique index if not exists poker_tournament_entries_active_table_seat_key
   on public.poker_tournament_entries(table_id,seat_number)
   where eliminated_at is null;
+
+-- Final-table metadata and live standings.
+alter table public.poker_tournaments
+  add column if not exists final_table_id uuid references public.poker_tables(id);
+
+create or replace function public.create_poker_tournament_final_table(p_tournament_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_t public.poker_tournaments%rowtype;
+  v_final_table uuid;
+  v_active integer;
+  v_seat integer;
+  v_player record;
+  v_moved integer := 0;
+begin
+  perform pg_advisory_xact_lock(hashtext(p_tournament_id::text));
+  select * into v_t from public.poker_tournaments where id=p_tournament_id for update;
+  if not found or v_t.status <> 'running' then
+    return jsonb_build_object('created',false,'reason','Tournament is not running');
+  end if;
+
+  if exists (
+    select 1 from public.poker_tournament_tables tt
+    join public.poker_hand_state hs on hs.table_id=tt.table_id
+    where tt.tournament_id=p_tournament_id
+      and hs.phase not in ('waiting','showdown')
+  ) then
+    return jsonb_build_object('created',false,'deferred',true,'reason','A hand is still in progress');
+  end if;
+
+  select count(*) into v_active
+  from public.poker_tournament_entries e
+  join public.poker_seats s on s.table_id=e.table_id and s.player_id=e.player_id
+  where e.tournament_id=p_tournament_id and e.eliminated_at is null and s.chips>0;
+
+  if v_active=0 or v_active>v_t.players_per_table then
+    return jsonb_build_object('created',false,'active_players',v_active);
+  end if;
+
+  if v_t.final_table_id is not null then
+    v_final_table:=v_t.final_table_id;
+  else
+    select table_id into v_final_table
+    from public.poker_tournament_tables
+    where tournament_id=p_tournament_id
+    order by table_number
+    limit 1;
+    if v_final_table is null then raise exception 'No tournament table is available for the final table'; end if;
+    update public.poker_tournaments set final_table_id=v_final_table where id=p_tournament_id;
+  end if;
+
+  -- The caller's trigger runs after a hand settles. This extra guard prevents
+  -- moving players while a live hand is running on the destination table.
+  if exists (
+    select 1 from public.poker_hand_state
+    where table_id=v_final_table and phase not in ('waiting','showdown')
+  ) then
+    return jsonb_build_object('created',false,'deferred',true,'reason','Final table is still in a hand');
+  end if;
+
+  -- Clear eliminated seats, keeping their tournament entry and finish record.
+  delete from public.poker_seats s
+  using public.poker_tournament_entries e
+  where e.tournament_id=p_tournament_id and e.player_id=s.player_id
+    and e.table_id=s.table_id and e.eliminated_at is not null and s.chips<=0;
+
+  -- Move every survivor onto the final table, preserving chip counts.
+  for v_player in
+    select s.player_id,s.table_id,s.seat_number,s.chips
+    from public.poker_seats s
+    join public.poker_tournament_entries e
+      on e.player_id=s.player_id and e.tournament_id=p_tournament_id
+    where e.eliminated_at is null and s.chips>0
+      and s.table_id<>v_final_table
+    order by s.chips desc,s.player_id
+    for update of s
+  loop
+    select min(n) into v_seat
+    from generate_series(1,v_t.players_per_table) n
+    where not exists (
+      select 1 from public.poker_seats x
+      where x.table_id=v_final_table and x.seat_number=n
+    );
+    if v_seat is null then raise exception 'No free final-table seat is available'; end if;
+
+    update public.poker_seats
+    set table_id=v_final_table,seat_number=v_seat
+    where table_id=v_player.table_id and player_id=v_player.player_id;
+
+    update public.poker_tournament_entries
+    set table_id=v_final_table,seat_number=v_seat
+    where tournament_id=p_tournament_id and player_id=v_player.player_id;
+
+    v_moved:=v_moved+1;
+  end loop;
+
+  return jsonb_build_object('created',true,'final_table_id',v_final_table,
+    'active_players',v_active,'players_moved',v_moved);
+end;
+$$;
+
+-- Run ordinary balancing first; if the field is down to one table, consolidate.
+create or replace function public.trigger_balance_poker_tournament_tables()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tournament_id uuid;
+  v_balance jsonb;
+begin
+  select tournament_id into v_tournament_id
+  from public.poker_tournament_tables
+  where table_id=new.table_id
+  limit 1;
+
+  if v_tournament_id is not null then
+    v_balance:=public.balance_poker_tournament_tables(v_tournament_id);
+    if coalesce((v_balance->>'deferred')::boolean,false)=false then
+      perform public.create_poker_tournament_final_table(v_tournament_id);
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.list_poker_tournaments()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',t.id,'name',t.name,'owner_id',t.owner_id,'table_count',t.table_count,
+    'players_per_table',t.players_per_table,'starting_chips',t.starting_chips,
+    'small_blind',t.small_blind,'big_blind',t.big_blind,
+    'blind_interval_minutes',t.blind_interval_minutes,'status',t.status,
+    'started_at',t.started_at,'blind_level',t.blind_level,'created_at',t.created_at,
+    'final_table_id',t.final_table_id,
+    'players',(select count(*) from public.poker_tournament_entries e where e.tournament_id=t.id and e.eliminated_at is null),
+    'eliminated',(select count(*) from public.poker_tournament_entries e where e.tournament_id=t.id and e.eliminated_at is not null),
+    'my_table_id',(select e.table_id from public.poker_tournament_entries e where e.tournament_id=t.id and e.player_id=auth.uid() and e.eliminated_at is null),
+    'capacity',t.table_count*t.players_per_table,
+    'leaderboard',(select coalesce(jsonb_agg(jsonb_build_object(
+      'player_id',e.player_id,
+      'display_name',coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker Player'),
+      'avatar_url',p.avatar_url,
+      'chips',case when e.eliminated_at is null then coalesce(s.chips,0) else 0 end,
+      'finish_position',e.finish_position,
+      'eliminated_at',e.eliminated_at,
+      'table_number',tt.table_number
+    ) order by case when e.eliminated_at is null then 0 else 1 end,
+      coalesce(s.chips,0) desc,e.finish_position asc nulls last),'[]'::jsonb)
+      from public.poker_tournament_entries e
+      left join public.poker_seats s on s.table_id=e.table_id and s.player_id=e.player_id
+      left join public.player_profiles p on p.id=e.player_id
+      left join auth.users u on u.id=e.player_id
+      left join public.poker_tournament_tables tt on tt.tournament_id=e.tournament_id and tt.table_id=e.table_id
+      where e.tournament_id=t.id),
+    'tables',(select coalesce(jsonb_agg(jsonb_build_object(
+      'table_id',pt.table_id,'table_number',pt.table_number,
+      'seated',(select count(*) from public.poker_seats s join public.poker_tournament_entries e on e.player_id=s.player_id and e.tournament_id=t.id where s.table_id=pt.table_id and e.eliminated_at is null and s.chips>0),
+      'max_players',t.players_per_table,
+      'is_final_table',pt.table_id=t.final_table_id
+    ) order by pt.table_number),'[]'::jsonb) from public.poker_tournament_tables pt where pt.tournament_id=t.id)
+  ) order by t.created_at desc),'[]'::jsonb)
+  from public.poker_tournaments t
+  where t.status in ('registration','running');
+$$;
+
+revoke all on function public.create_poker_tournament_final_table(uuid) from public;
+grant execute on function public.create_poker_tournament_final_table(uuid) to authenticated;
