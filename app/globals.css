@@ -347,3 +347,11 @@ a { color: inherit; text-decoration: none; }
 .feature-chip img { position: static; display: block; width: 70px; height: 24px; max-width: 100%; padding: 0; object-fit: contain; object-position: center; transform: none; }
 .playing-card-back { display: grid; place-items: center; overflow: hidden; }
 .playing-card-back img { position: static; display: block; width: 42px; height: 14px; max-width: 100%; padding: 0; object-fit: contain; object-position: center; transform: none; opacity: 1; }
+
+
+/* Manual Texas Hold'em wager entry */
+.raise-entry{display:flex;flex-direction:column;gap:5px;min-width:112px;color:#c6d4bc;font-size:9px;font-weight:900;letter-spacing:1px}
+.raise-entry input{width:112px;box-sizing:border-box;padding:12px 10px;border:1px solid #60784b;border-radius:8px;background:#0d160f;color:#f5f7ef;font-size:13px;font-weight:800;letter-spacing:0}
+.raise-entry input:focus{outline:2px solid #b7ed54;outline-offset:1px}
+.raise-entry input:disabled{opacity:.4}
+@media(max-width:800px){.raise-entry{min-width:100px}.raise-entry input{width:100px}}
