@@ -93,6 +93,7 @@ begin
   if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',u.id,'email',u.email,'is_anonymous',coalesce(u.is_anonymous,false),
+    'is_test_player',(coalesce(u.is_anonymous,false) and coalesce(u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','')='Roulo Test Player'),
     'display_name',coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker player'),
     'is_admin',exists(select 1 from public.poker_admins a where a.user_id=u.id)
   ) order by lower(coalesce(u.email,''))),'[]'::jsonb)
