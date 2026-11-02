@@ -711,3 +711,57 @@ main.profile-shell.tournament-history-shell .tournament-record-player-list {
  .tournament-admin-panel .admin-section-head { flex-direction:column;align-items:stretch; }
  .tournament-admin-panel .admin-action-group { justify-content:flex-start; }
 }
+
+/* Hard guardrails for tournament admin page sizing. */
+main.admin-shell.tournament-admin-shell {
+  display:block !important;
+  box-sizing:border-box !important;
+  width:100% !important;
+  max-width:1480px !important;
+  min-width:0 !important;
+  margin:0 auto !important;
+  padding:28px clamp(16px,3vw,36px) 56px !important;
+  flex:none !important;
+  align-self:stretch !important;
+}
+main.admin-shell.tournament-admin-shell > header,
+main.admin-shell.tournament-admin-shell > section,
+main.admin-shell.tournament-admin-shell > div,
+main.admin-shell.tournament-admin-shell > p {
+  box-sizing:border-box;
+  width:100% !important;
+  min-width:0 !important;
+}
+main.admin-shell.tournament-admin-shell .admin-metrics.tournament-admin-metrics {
+  display:grid !important;
+  width:100% !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:14px !important;
+}
+main.admin-shell.tournament-admin-shell .tournament-admin-panel {
+  display:block !important;
+  width:100% !important;
+  padding:23px !important;
+}
+main.admin-shell.tournament-admin-shell .tournament-admin-event {
+  display:block !important;
+  width:100% !important;
+}
+main.admin-shell.tournament-admin-shell .tournament-admin-blinds {
+  display:flex !important;
+  width:100% !important;
+}
+main.admin-shell.tournament-admin-shell .tournament-admin-tables {
+  display:grid !important;
+  width:100% !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+}
+@media(max-width:850px) {
+  main.admin-shell.tournament-admin-shell .admin-metrics.tournament-admin-metrics { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  main.admin-shell.tournament-admin-shell .tournament-admin-tables { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+}
+@media(max-width:600px) {
+  main.admin-shell.tournament-admin-shell { padding:16px 12px 36px !important; }
+  main.admin-shell.tournament-admin-shell .tournament-admin-panel { padding:15px !important; }
+  main.admin-shell.tournament-admin-shell .tournament-admin-tables { grid-template-columns:1fr !important; }
+}
