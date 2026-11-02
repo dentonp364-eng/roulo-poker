@@ -569,3 +569,65 @@ main.profile-shell.tournament-history-shell .tournament-record-standings li { mi
   }
   main.profile-shell.tournament-history-shell .record-metric-value { font-size:27px !important; }
 }
+
+/* Fix narrow/shrunk tournament history layout: keep the page and all
+   full-width sections at the viewport's available width. */
+html, body { width:100%; }
+body { overflow-x:hidden; }
+main.profile-shell.tournament-history-shell {
+  display:block !important;
+  width:100% !important;
+  max-width:1180px !important;
+  min-width:0 !important;
+  margin:0 auto !important;
+  padding:24px 28px 55px !important;
+  flex:none !important;
+  align-self:stretch !important;
+}
+main.profile-shell.tournament-history-shell > * {
+  width:100%;
+  min-width:0;
+}
+main.profile-shell.tournament-history-shell .profile-page-heading {
+  display:block;
+  width:100%;
+  max-width:none;
+  padding:36px 0 24px;
+}
+main.profile-shell.tournament-history-shell .profile-page-heading h1 {
+  max-width:none;
+  white-space:normal;
+}
+main.profile-shell.tournament-history-shell .profile-page-heading p {
+  max-width:760px;
+  width:100%;
+}
+main.profile-shell.tournament-history-shell .profile-topbar {
+  width:100%;
+  min-width:0;
+  flex-wrap:wrap;
+}
+main.profile-shell.tournament-history-shell .profile-topbar>div {
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+main.profile-shell.tournament-history-shell .tournament-record-summary {
+  width:100% !important;
+  display:grid !important;
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+}
+main.profile-shell.tournament-history-shell .tournament-record-section,
+main.profile-shell.tournament-history-shell .tournament-record-list,
+main.profile-shell.tournament-history-shell .tournament-record-card,
+main.profile-shell.tournament-history-shell .tournament-record-player-list {
+  width:100%;
+  min-width:0;
+}
+@media(max-width:700px) {
+  main.profile-shell.tournament-history-shell { padding:16px 14px 36px !important; }
+  main.profile-shell.tournament-history-shell .profile-topbar { align-items:flex-start; }
+  main.profile-shell.tournament-history-shell .profile-topbar>div { justify-content:flex-start; }
+  main.profile-shell.tournament-history-shell .tournament-record-summary {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+}
