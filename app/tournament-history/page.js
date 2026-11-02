@@ -35,19 +35,19 @@ export default function TournamentHistoryPage() {
     <section className="profile-page-heading">
       <span className="profile-kicker">THE ROULO COMPETITIVE RECORD</span>
       <h1>Tournament history</h1>
-      <p>Completed events, final positions and player records. Tournament performance is kept separate from cash-game statistics.</p>
+      <p>A clear record of completed events, final standings and player achievements — separate from cash-game stats.</p>
     </section>
     {message&&<p className="profile-message" role="status">{message}</p>}
-    <section className="tournament-record-summary">
-      <article><span>COMPLETED EVENTS</span><strong>{results.length}</strong></article>
-      <article><span>PLAYERS RECORDED</span><strong>{players}</strong></article>
-      <article><span>TOURNAMENT WINS</span><strong>{wins}</strong></article>
-      <article><span>TOP-THREE FINISHES</span><strong>{podiums}</strong></article>
+    <section className="tournament-record-summary" aria-label="Tournament statistics">
+      <article><span className="record-metric-label">Completed events</span><strong className="record-metric-value">{results.length.toLocaleString()}</strong><small>Events finished</small></article>
+      <article><span className="record-metric-label">Players recorded</span><strong className="record-metric-value">{players.toLocaleString()}</strong><small>Ranked players</small></article>
+      <article><span className="record-metric-label">Tournament wins</span><strong className="record-metric-value">{wins.toLocaleString()}</strong><small>First-place finishes</small></article>
+      <article><span className="record-metric-label">Podium finishes</span><strong className="record-metric-value">{podiums.toLocaleString()}</strong><small>Top-three finishes</small></article>
     </section>
     <section className="profile-history-section tournament-record-section">
       <div className="profile-section-heading"><div><span className="profile-kicker">EVENT ARCHIVE</span><h2>Completed tournaments</h2></div><button className="profile-back" onClick={load}>↻ Refresh</button></div>
       {loading?<div className="profile-empty">Loading tournament records…</div>:results.length===0?
-        <div className="profile-empty">No completed tournaments yet. Finished events will appear here with their final standings.</div>:
+        <div className="profile-empty">There are no completed tournaments yet. Final standings will appear here when an event finishes.</div>:
         <div className="tournament-record-list">{results.map(event=><article className="tournament-record-card" key={event.id}>
           <div className="tournament-record-heading"><div><span className="profile-kicker">COMPLETED EVENT</span><h3>{event.name}</h3><p>{event.completed_at?new Date(event.completed_at).toLocaleString([],{dateStyle:"medium",timeStyle:"short"}):"Completion date unavailable"}</p></div><strong>{event.players} <small>PLAYERS</small></strong></div>
           <div className="tournament-record-standings"><div className="eyebrow">FINAL STANDINGS</div>
@@ -62,7 +62,7 @@ export default function TournamentHistoryPage() {
     </section>
     <section className="profile-history-section tournament-record-section">
       <div className="profile-section-heading"><div><span className="profile-kicker">PLAYER RECORDS</span><h2>All-time tournament leaders</h2></div><a className="profile-back" href="/tournament-leaderboard">Full rankings →</a></div>
-      {loading?<div className="profile-empty">Loading player records…</div>:rankings.length===0?<div className="profile-empty">Player records will appear after tournament results are recorded.</div>:
+      {loading?<div className="profile-empty">Loading player records…</div>:rankings.length===0?<div className="profile-empty">Player records will appear here once tournament results are available.</div>:
         <div className="tournament-record-player-list">{rankings.slice(0,10).map(player=><a href={"/profile/"+player.player_id} className="tournament-record-player" key={player.player_id}>
           <span className="record-player-rank">#{player.rank}</span><strong>{player.display_name}</strong><span>{player.tournaments_entered} events</span><span>{player.wins} wins</span><b>{player.points} pts</b>
         </a>)}</div>}
