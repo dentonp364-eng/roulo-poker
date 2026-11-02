@@ -85,6 +85,7 @@ export default function AdminPage() {
 
   return <main className="admin-shell">
     <header className="admin-topbar"><a className="admin-brand" href="/"><img src="/roulo-logo.png" alt="Roulo" /><small>POKER</small></a><div><span className="admin-kicker">CONTROL ROOM</span><h1>Admin panel</h1></div><button className="admin-secondary" onClick={() => router.push("/")}>← Lobby</button></header>
+    <div className="admin-dashboard-shortcut"><a className="admin-secondary" href="/admin/tournaments">♠ Tournament management →</a></div>
     {message && <div className="admin-message" role="status">{message}</div>}
     <section className="admin-metrics">
       <article><span>ALL TABLES</span><strong>{tables.length}</strong></article>
