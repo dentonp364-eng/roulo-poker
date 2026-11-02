@@ -16,17 +16,19 @@ begin
     raise exception 'Only a Roulo Poker administrator can delete tournaments';
   end if;
 
-  select t.name, coalesce(array_agg(tt.table_id) filter (where tt.table_id is not null), array[]::uuid[])
-  into v_name, v_table_ids
+  select t.name into v_name
   from public.poker_tournaments t
-  left join public.poker_tournament_tables tt on tt.tournament_id=t.id
   where t.id=p_tournament_id
-  group by t.id
-  for update of t;
+  for update;
 
   if v_name is null then
     raise exception 'Tournament not found';
   end if;
+
+  select coalesce(array_agg(tt.table_id), array[]::uuid[])
+  into v_table_ids
+  from public.poker_tournament_tables tt
+  where tt.tournament_id=p_tournament_id;
 
   if exists (
     select 1 from public.poker_hand_state hs
