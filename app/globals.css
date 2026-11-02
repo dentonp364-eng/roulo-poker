@@ -477,3 +477,39 @@ a { color: inherit; text-decoration: none; }
 .tournament-points-note{margin-top:14px;font-size:10px}
 .tournament-ranking-shell .profile-topbar>div{gap:16px}
 @media(max-width:600px){.tournament-ranking-shell .profile-topbar>div{gap:8px;flex-wrap:wrap}.tournament-ranking-shell .profile-topbar>div>a{font-size:10px}}
+
+
+/* Tournament history and player records */
+.tournament-history-shell { max-width:1180px; }
+.tournament-record-summary { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0; }
+.tournament-record-summary article { padding:20px;border:1px solid #303b2d;border-radius:13px;background:linear-gradient(145deg,#182117,#101610);display:grid;gap:9px; }
+.tournament-record-summary article span { color:#9ca995;font-size:9px;font-weight:850;letter-spacing:1.2px; }
+.tournament-record-summary article strong { color:#e7f4d8;font-size:28px;font-weight:900; }
+.tournament-record-section { margin-top:22px; }
+.tournament-record-list { display:grid;gap:14px; }
+.tournament-record-card { padding:20px;border:1px solid #303b2d;border-radius:14px;background:#111811; }
+.tournament-record-heading { display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:16px;border-bottom:1px solid #293329; }
+.tournament-record-heading h3 { margin:5px 0;font-size:19px;color:#edf2e8; }
+.tournament-record-heading p { margin:0;color:#8e9a88;font-size:11px; }
+.tournament-record-heading>strong { color:#c8ed8c;font-size:20px;white-space:nowrap; }
+.tournament-record-heading>strong small { color:#899583;font-size:9px;letter-spacing:1px; }
+.tournament-record-standings { padding-top:15px; }
+.tournament-record-standings ol { list-style:none;padding:0;margin:9px 0 0;display:grid; }
+.tournament-record-standings li { display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 8px;border-bottom:1px solid #263026;color:#e2e9dc;font-size:12px; }
+.tournament-record-standings li:last-child { border-bottom:0; }
+.tournament-record-standings li a { color:#e2e9dc;text-decoration:none;font-weight:750; }
+.tournament-record-standings li a:hover { color:#c8ed8c; }
+.record-position { color:#b9df79;font-weight:900; }
+.tournament-record-standings li em { color:#c8ed8c;font-size:9px;font-style:normal;font-weight:900;letter-spacing:1px; }
+.tournament-record-player-list { display:grid; }
+.tournament-record-player { display:grid;grid-template-columns:48px minmax(0,1fr) 100px 80px 70px;align-items:center;gap:12px;padding:14px 8px;border-bottom:1px solid #293329;color:#b5c0ad;text-decoration:none;font-size:11px; }
+.tournament-record-player:hover { background:#172117; }
+.tournament-record-player strong { color:#edf2e8;font-size:12px; }
+.tournament-record-player b { color:#c8ed8c;text-align:right; }
+.record-player-rank { color:#c8ed8c;font-weight:900; }
+@media(max-width:650px) {
+ .tournament-record-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .tournament-record-player { grid-template-columns:35px minmax(0,1fr) 65px;gap:8px; }
+ .tournament-record-player span:nth-of-type(2),.tournament-record-player b { display:none; }
+ .tournament-record-heading h3 { font-size:16px; }
+}
