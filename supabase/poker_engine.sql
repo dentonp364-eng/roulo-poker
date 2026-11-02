@@ -128,9 +128,15 @@ begin
     values(p_table_id,v_hand,v_seat.player_id,v_cards);
   end loop;
 
-  v_sb := coalesce((select seat_number from public.poker_seats where table_id=p_table_id and chips>0
-    and seat_number > v_dealer order by seat_number limit 1),
-    (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0));
+  -- Heads-up: the dealer posts the small blind. With 3+ players, the
+  -- small blind is the first funded seat clockwise after the dealer.
+  if (select count(*) from public.poker_seats where table_id=p_table_id and chips>0) = 2 then
+    v_sb := v_dealer;
+  else
+    v_sb := coalesce((select seat_number from public.poker_seats where table_id=p_table_id and chips>0
+      and seat_number > v_dealer order by seat_number limit 1),
+      (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0));
+  end if;
   v_bb := coalesce((select seat_number from public.poker_seats where table_id=p_table_id and chips>0
     and seat_number > v_sb order by seat_number limit 1),
     (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0 and seat_number<>v_sb));
@@ -141,8 +147,17 @@ begin
   update public.poker_seats set chips=chips-v_bb_paid where table_id=p_table_id and seat_number=v_bb;
   v_pot := v_sb_paid + v_bb_paid;
 
-  v_actor := coalesce((select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0 and seat_number>v_bb),
-                      (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0));
+  -- Preflop action starts left of the big blind in multiway pots.
+  -- Heads-up, the dealer/small blind acts first unless already all-in.
+  if (select count(*) from public.poker_seats where table_id=p_table_id and chips>0) = 2 then
+    v_actor := coalesce(
+      (select seat_number from public.poker_seats where table_id=p_table_id and seat_number=v_dealer and chips>0),
+      (select seat_number from public.poker_seats where table_id=p_table_id and seat_number=v_bb and chips>0)
+    );
+  else
+    v_actor := coalesce((select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0 and seat_number>v_bb),
+                        (select min(seat_number) from public.poker_seats where table_id=p_table_id and chips>0));
+  end if;
 
   insert into public.poker_private_decks(table_id,hand_number,cards) values(p_table_id,v_hand,v_deck);
   insert into public.poker_hand_state(table_id,hand_number,phase,board,pot,current_bet,acting_seat,dealer_seat,contributions,folded_seats,acted_seats,updated_at,last_raise_size)
