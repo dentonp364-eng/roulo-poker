@@ -339,3 +339,165 @@ when (new.phase='showdown' and old.phase is distinct from new.phase)
 execute function public.record_poker_tournament_eliminations();
 
 revoke all on function public.record_poker_tournament_eliminations() from public;
+
+-- Rebalance tournament tables after a hand has finished. Players are moved
+-- only when every tournament table is between hands; chip stacks are preserved.
+create or replace function public.balance_poker_tournament_tables(p_tournament_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_t public.poker_tournaments%rowtype;
+  v_donor uuid;
+  v_receiver uuid;
+  v_player uuid;
+  v_old_seat integer;
+  v_new_seat integer;
+  v_moved integer := 0;
+  v_removed integer := 0;
+  v_donor_count integer;
+  v_receiver_count integer;
+begin
+  perform pg_advisory_xact_lock(hashtext(p_tournament_id::text));
+
+  select * into v_t
+  from public.poker_tournaments
+  where id=p_tournament_id
+  for update;
+
+  if not found or v_t.status <> 'running' then
+    return jsonb_build_object('balanced',false,'reason','Tournament is not running');
+  end if;
+
+  -- Never disturb a live hand on any tournament table.
+  if exists (
+    select 1
+    from public.poker_tournament_tables tt
+    join public.poker_hand_state hs on hs.table_id=tt.table_id
+    where tt.tournament_id=p_tournament_id
+      and hs.phase not in ('waiting','showdown')
+  ) then
+    return jsonb_build_object('balanced',false,'deferred',true,'reason','A hand is still in progress');
+  end if;
+
+  -- Remove eliminated zero-stack seats now that the hand has settled.
+  delete from public.poker_seats s
+  using public.poker_tournament_entries e
+  where e.tournament_id=p_tournament_id
+    and e.player_id=s.player_id
+    and e.table_id=s.table_id
+    and e.eliminated_at is not null
+    and s.chips <= 0;
+  get diagnostics v_removed = row_count;
+
+  loop
+    select tt.table_id,count(s.id)::integer
+      into v_donor,v_donor_count
+    from public.poker_tournament_tables tt
+    left join public.poker_seats s on s.table_id=tt.table_id
+    where tt.tournament_id=p_tournament_id
+    group by tt.table_id,tt.table_number
+    order by count(s.id) desc,tt.table_number
+    limit 1;
+
+    select tt.table_id,count(s.id)::integer
+      into v_receiver,v_receiver_count
+    from public.poker_tournament_tables tt
+    left join public.poker_seats s on s.table_id=tt.table_id
+    where tt.tournament_id=p_tournament_id
+    group by tt.table_id,tt.table_number
+    order by count(s.id),tt.table_number
+    limit 1;
+
+    if v_donor is null or v_receiver is null
+      or v_donor=v_receiver
+      or v_donor_count-v_receiver_count <= 1 then
+      exit;
+    end if;
+
+    if v_receiver_count >= v_t.players_per_table then
+      exit;
+    end if;
+
+    select s.player_id,s.seat_number
+      into v_player,v_old_seat
+    from public.poker_seats s
+    join public.poker_tournament_entries e
+      on e.player_id=s.player_id and e.tournament_id=p_tournament_id
+    where s.table_id=v_donor
+      and s.chips > 0
+      and e.eliminated_at is null
+    order by s.seat_number desc
+    limit 1
+    for update of s;
+
+    if v_player is null then
+      exit;
+    end if;
+
+    select min(n) into v_new_seat
+    from generate_series(1,v_t.players_per_table) n
+    where not exists (
+      select 1 from public.poker_seats s
+      where s.table_id=v_receiver and s.seat_number=n
+    );
+
+    if v_new_seat is null then
+      exit;
+    end if;
+
+    -- Updating the seat row preserves its chips and player identity.
+    update public.poker_seats
+    set table_id=v_receiver,seat_number=v_new_seat
+    where table_id=v_donor and player_id=v_player;
+
+    update public.poker_tournament_entries
+    set table_id=v_receiver,seat_number=v_new_seat
+    where tournament_id=p_tournament_id and player_id=v_player;
+
+    v_moved := v_moved + 1;
+    v_player := null;
+  end loop;
+
+  return jsonb_build_object(
+    'balanced',true,
+    'players_moved',v_moved,
+    'eliminated_seats_removed',v_removed
+  );
+end;
+$$;
+
+-- Run balancing after elimination tracking for each completed hand.
+create or replace function public.trigger_balance_poker_tournament_tables()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tournament_id uuid;
+begin
+  select tournament_id into v_tournament_id
+  from public.poker_tournament_tables
+  where table_id=new.table_id
+  limit 1;
+
+  if v_tournament_id is not null then
+    perform public.balance_poker_tournament_tables(v_tournament_id);
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists zz_poker_tournament_balance_after_hand on public.poker_hand_state;
+create trigger zz_poker_tournament_balance_after_hand
+after update of phase on public.poker_hand_state
+for each row
+when (new.phase='showdown' and old.phase is distinct from new.phase)
+execute function public.trigger_balance_poker_tournament_tables();
+
+revoke all on function public.balance_poker_tournament_tables(uuid) from public;
+revoke all on function public.trigger_balance_poker_tournament_tables() from public;
