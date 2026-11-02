@@ -695,7 +695,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',t.id,'name',t.name,'started_at',t.started_at,'completed_at',t.completed_at,
     'players',(select count(*) from public.poker_tournament_entries e where e.tournament_id=t.id),
@@ -710,7 +710,7 @@ as $
     where e.tournament_id=t.id)
   ) order by t.completed_at desc nulls last),'[]'::jsonb)
   from public.poker_tournaments t
-  where t.status='completed';$
-;
+  where t.status='completed';
+$$;
 revoke all on function public.list_poker_tournament_results() from public;
 grant execute on function public.list_poker_tournament_results() to authenticated;
