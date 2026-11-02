@@ -56,8 +56,10 @@ begin
   if v_user is null then raise exception 'Sign in first'; end if;
   select * into v_t from public.poker_tournaments where id=p_tournament_id for update;
   if not found then raise exception 'Tournament not found'; end if;
-  if v_t.owner_id <> v_user and not public.is_poker_admin() then
-    raise exception 'Only the tournament host or an administrator can advance tournament levels';
+  if v_t.owner_id <> v_user and not public.is_poker_admin() and not exists (
+    select 1 from public.poker_tournament_entries e where e.tournament_id=p_tournament_id and e.player_id=v_user
+  ) then
+    raise exception 'Only a tournament participant, host or administrator can advance tournament levels';
   end if;
   if v_t.status <> 'running' or v_t.started_at is null then
     return jsonb_build_object('running',false,'status',v_t.status);
