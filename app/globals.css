@@ -631,3 +631,41 @@ main.profile-shell.tournament-history-shell .tournament-record-player-list {
     grid-template-columns:repeat(2,minmax(0,1fr)) !important;
   }
 }
+
+/* Keep the original Roulo artwork and POKER wordmark on one aligned row. */
+.profile-topbar .profile-brand {
+  display:inline-flex !important;
+  flex:0 0 auto;
+  flex-direction:row;
+  align-items:center !important;
+  justify-content:flex-start;
+  gap:10px;
+  width:auto;
+  min-width:max-content;
+  white-space:nowrap;
+  line-height:1;
+}
+.profile-topbar .profile-brand img {
+  display:block;
+  flex:0 0 126px;
+  width:126px;
+  height:44px;
+  object-fit:contain;
+  object-position:left center;
+}
+.profile-topbar .profile-brand b {
+  display:block;
+  flex:0 0 auto;
+  margin:0;
+  padding:0;
+  line-height:1;
+  font-size:20px;
+  letter-spacing:1.6px;
+  white-space:nowrap;
+  align-self:center;
+}
+@media(max-width:650px) {
+  .profile-topbar .profile-brand { gap:7px; }
+  .profile-topbar .profile-brand img { flex-basis:112px;width:112px;height:40px; }
+  .profile-topbar .profile-brand b { font-size:17px; }
+}
