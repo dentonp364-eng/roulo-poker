@@ -90,7 +90,7 @@ export default function TournamentsPage() {
   return <main className="lobby-page tournament-page">
     <header className="topbar">
       <a className="brand" href="/"><img className="roulo-wordmark" src="/roulo-logo.png" alt="Roulo"/><span className="brand-name"><b>POKER</b></span></a>
-      <nav className="main-nav"><a href="/">Poker lobby</a><a className="nav-active" href="/tournaments">Tournaments</a><a href="/history">Hand history</a></nav>
+      <nav className="main-nav"><a href="/">Poker lobby</a><a className="nav-active" href="/tournaments">Tournaments</a><a href="/tournament-leaderboard">Rankings</a><a href="/history">Hand history</a></nav>
       <a className="button button-quiet" href="/">← Back to lobby</a>
     </header>
 
