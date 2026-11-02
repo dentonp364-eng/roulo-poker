@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 
@@ -32,11 +33,75 @@ export default function PokerTablePage() {
   const [acting, setActing] = useState(false);
   const [connection, setConnection] = useState("CONNECTING");
   const [lastSynced, setLastSynced] = useState(null);
+  const [testPlayerMode, setTestPlayerMode] = useState(false);
+  const [testModeChecked, setTestModeChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [testSetupBusy, setTestSetupBusy] = useState(false);
+
+  const testClient = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    { auth: { storageKey: `roulo-test-player-${tableId}`, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }
+  ), [tableId]);
+  const db = testPlayerMode ? testClient : supabase;
+
+  useEffect(() => {
+    setTestPlayerMode(new URLSearchParams(window.location.search).get("testPlayer") === "1");
+    setTestModeChecked(true);
+  }, []);
+
+  useEffect(() => {
+    if (testPlayerMode || !testModeChecked) return;
+    supabase.rpc("is_poker_admin").then(({ data }) => setIsAdmin(data === true)).catch(() => setIsAdmin(false));
+  }, [testPlayerMode, testModeChecked]);
+
+  useEffect(() => {
+    if (!testModeChecked || !testPlayerMode) return;
+    let cancelled = false;
+    async function prepareTestPlayer() {
+      setTestSetupBusy(true);
+      setError("");
+      const [{ data: adminAuth }, { data: adminAccess }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.rpc("is_poker_admin")
+      ]);
+      if (cancelled) return;
+      if (!adminAuth?.user || adminAccess !== true) {
+        setError("Only a signed-in Roulo Poker administrator can launch a test player.");
+        setTestSetupBusy(false);
+        setLoading(false);
+        return;
+      }
+      let { data: sessionData } = await testClient.auth.getSession();
+      if (!sessionData?.session) {
+        const { data, error: signInError } = await testClient.auth.signInAnonymously({ options: { data: { full_name: "Roulo Test Player", name: "Roulo Test Player" } } });
+        if (signInError) {
+          setError(signInError.message.includes("Anonymous") ? "Anonymous sign-ins are disabled in Supabase. Enable Authentication → Sign In / Providers → Anonymous Sign-Ins, then reopen this test player." : signInError.message);
+          setTestSetupBusy(false);
+          setLoading(false);
+          return;
+        }
+        sessionData = { session: data.session };
+      }
+      const { error: joinError } = await testClient.rpc("join_poker_table", { p_table_id: tableId, p_invite_code: null });
+      if (cancelled) return;
+      if (joinError) {
+        setError(joinError.message);
+        setTestSetupBusy(false);
+        setLoading(false);
+        return;
+      }
+      setTestSetupBusy(false);
+      await load();
+    }
+    prepareTestPlayer();
+    return () => { cancelled = true; };
+  }, [testModeChecked, testPlayerMode, tableId, testClient]);
 
   const load = useCallback(async () => {
     const [{ data: auth }, { data, error: tableError }] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase.from("poker_tables")
+      db.auth.getUser(),
+      db.from("poker_tables")
         .select("id,name,owner_id,small_blind,big_blind,max_players,is_private,status,poker_seats(id,player_id,seat_number,chips)")
         .eq("id", tableId).single()
     ]);
@@ -45,7 +110,7 @@ export default function PokerTablePage() {
     setTable(data);
     const ids = (data.poker_seats || []).map(s => s.player_id);
     if (ids.length) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await db
         .from("player_profiles").select("id,discord_name,avatar_url").in("id", ids);
       setPlayers((data.poker_seats || []).map(s => ({
         ...s, profile: (profiles || []).find(p => p.id === s.player_id)
@@ -54,20 +119,21 @@ export default function PokerTablePage() {
 
     if (auth.user) {
       const [{ data: handData }, { data: privateCards }] = await Promise.all([
-        supabase.from("poker_hand_state").select("*").eq("table_id", tableId).maybeSingle(),
-        supabase.from("poker_hole_cards").select("cards,hand_number").eq("table_id", tableId).eq("player_id", auth.user.id).order("hand_number", { ascending: false }).limit(1).maybeSingle()
+        db.from("poker_hand_state").select("*").eq("table_id", tableId).maybeSingle(),
+        db.from("poker_hole_cards").select("cards,hand_number").eq("table_id", tableId).eq("player_id", auth.user.id).order("hand_number", { ascending: false }).limit(1).maybeSingle()
       ]);
       setHand(handData || null);
       setHoleCards(privateCards?.cards || []);
     }
     setLastSynced(new Date());
     setLoading(false);
-  }, [tableId]);
+  }, [tableId, db]);
 
   useEffect(() => {
+    if (!testModeChecked || (testPlayerMode && testSetupBusy)) return;
     let alive = true;
     load();
-    const channel = supabase.channel("poker-table-" + tableId)
+    const channel = db.channel("poker-table-" + tableId)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_seats",filter:"table_id=eq." + tableId}, load)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_tables",filter:"id=eq." + tableId}, load)
       .on("postgres_changes", {event:"*",schema:"public",table:"poker_hand_state",filter:"table_id=eq." + tableId}, load)
@@ -92,15 +158,15 @@ export default function PokerTablePage() {
       window.removeEventListener("focus", refreshWhenActive);
       window.removeEventListener("online", refreshWhenActive);
       document.removeEventListener("visibilitychange", refreshWhenActive);
-      supabase.removeChannel(channel);
+      db.removeChannel(channel);
     };
-  }, [load, tableId]);
+  }, [load, tableId, db, testModeChecked, testPlayerMode, testSetupBusy]);
 
   async function takeAction(action, amount = 0) {
     if (acting) return;
     setActing(true);
     setError("");
-    const { error: actionError } = await supabase.rpc("poker_player_action", {
+    const { error: actionError } = await db.rpc("poker_player_action", {
       p_table_id: tableId, p_action: action, p_amount: amount
     });
     setActing(false);
@@ -112,13 +178,13 @@ export default function PokerTablePage() {
     if (starting) return;
     setStarting(true);
     setError("");
-    const { error: startError } = await supabase.rpc("start_poker_hand", { p_table_id: tableId });
+    const { error: startError } = await db.rpc("start_poker_hand", { p_table_id: tableId });
     setStarting(false);
     if (startError) setError(startError.message);
     else await load();
   }
 
-  if (loading) return <main className="poker-shell"><p className="table-loading">Loading table…</p></main>;
+  if (loading || !testModeChecked || testSetupBusy) return <main className="poker-shell"><p className="table-loading">{testPlayerMode ? "Preparing temporary test player…" : "Loading table…"}</p></main>;
   if (error && !table) return <main className="poker-shell"><button className="table-back" onClick={()=>router.push("/")}>← Lobby</button><p>{error}</p></main>;
   if (!table) return <main className="poker-shell"><button className="table-back" onClick={()=>router.push("/")}>← Lobby</button><p>Table not found.</p></main>;
 
@@ -146,6 +212,8 @@ export default function PokerTablePage() {
       <button className="table-back" onClick={()=>router.push("/")}>← BACK TO LOBBY</button>
     </header>
     {error && <p className="table-error" role="alert">{error}</p>}
+    {testPlayerMode && <div className="table-error">TEMPORARY TEST PLAYER · Separate anonymous session <button onClick={async()=>{const {data:{user:testUser}}=await testClient.auth.getUser();if(testUser){const {error:removeError}=await supabase.rpc("admin_remove_poker_player",{p_table_id:tableId,p_player_id:testUser.id});if(removeError){setError(removeError.message);return;}}await testClient.auth.signOut();window.location.href="/table/"+tableId;}}>REMOVE TEST PLAYER</button></div>}
+    {!testPlayerMode && isAdmin && <div className="table-connection-bar"><span>ADMIN TESTING</span><button onClick={()=>window.open("/table/"+tableId+"?testPlayer=1","_blank","noopener,noreferrer")}>＋ ADD TEMPORARY TEST PLAYER</button></div>}
     <div className="table-connection-bar"><span className={connection === "LIVE" ? "connection-dot live" : "connection-dot"} />{connection === "LIVE" ? "LIVE SYNC" : connection === "RECONNECTING" ? "RECONNECTING…" : "CONNECTING…"}<button onClick={load} disabled={loading || acting || starting}>REFRESH TABLE</button>{lastSynced && <small>Synced {lastSynced.toLocaleTimeString()}</small>}</div>
     <section className="table-stage">
       <div className="felt-table">
