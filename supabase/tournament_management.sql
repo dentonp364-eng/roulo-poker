@@ -119,7 +119,7 @@ grant execute on function public.advance_poker_tournament_blinds(uuid) to authen
 grant execute on function public.list_poker_tournaments() to authenticated;
 
 
--- Let an already-registered player reopen their assigned table after registration closes.
+-- Keep tournament table mappings complete before registering a player.
 create or replace function public.register_poker_tournament(p_tournament_id uuid)
 returns jsonb
 language plpgsql
@@ -132,6 +132,8 @@ declare
   v_table_id uuid;
   v_seat integer;
   v_existing public.poker_tournament_entries%rowtype;
+  v_table public.poker_tables%rowtype;
+  i integer;
 begin
   if v_user is null then raise exception 'Sign in first'; end if;
   select * into v_t from public.poker_tournaments where id=p_tournament_id for update;
@@ -152,12 +154,31 @@ begin
   values(v_user,'Poker Player',v_t.starting_chips)
   on conflict(id) do nothing;
 
+  -- Older/partially-created tournaments may have no mapping rows. Rebuild only
+  -- missing table numbers; existing tables and player seats are left untouched.
+  for i in 1..v_t.table_count loop
+    if not exists (
+      select 1 from public.poker_tournament_tables pt
+      where pt.tournament_id=p_tournament_id and pt.table_number=i
+    ) then
+      insert into public.poker_tables(name,owner_id,small_blind,big_blind,max_players,is_private,status,invite_code)
+      values(v_t.name || ' · Table ' || i,v_t.owner_id,v_t.small_blind,v_t.big_blind,v_t.players_per_table,false,'waiting',null)
+      returning * into v_table;
+      insert into public.poker_tournament_tables(tournament_id,table_id,table_number)
+      values(p_tournament_id,v_table.id,i);
+    end if;
+  end loop;
+
   select pt.table_id into v_table_id
   from public.poker_tournament_tables pt
   where pt.tournament_id=p_tournament_id
   order by (select count(*) from public.poker_seats s where s.table_id=pt.table_id),pt.table_number
   limit 1
   for update;
+
+  if v_table_id is null then
+    raise exception 'Tournament tables could not be prepared. Please contact the administrator.';
+  end if;
 
   select min(n) into v_seat
   from generate_series(1,v_t.players_per_table) n
