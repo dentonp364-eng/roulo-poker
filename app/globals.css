@@ -382,3 +382,31 @@ a { color: inherit; text-decoration: none; }
  .felt-table.seats-8 .seat-8{top:calc(50% - 30px);left:-10px}
  .action-panel{align-items:flex-end}
 }
+
+
+/* Nine-seat oval: evenly spaced clockwise around the felt. */
+.felt-table.seats-9 .player-seat{left:auto;right:auto;top:auto;bottom:auto;transform:translate(-50%,-50%)}
+.felt-table.seats-9 .seat-1{left:50%;top:0}
+.felt-table.seats-9 .seat-2{left:80%;top:12%}
+.felt-table.seats-9 .seat-3{left:92%;top:35%}
+.felt-table.seats-9 .seat-4{left:92%;top:65%}
+.felt-table.seats-9 .seat-5{left:80%;top:88%}
+.felt-table.seats-9 .seat-6{left:50%;top:100%}
+.felt-table.seats-9 .seat-7{left:20%;top:88%}
+.felt-table.seats-9 .seat-8{left:8%;top:65%}
+.felt-table.seats-9 .seat-9{left:8%;top:35%}
+
+/* Keep seat cards balanced on tablet and mobile widths. */
+@media(max-width:800px){
+ .felt-table.seats-9 .player-seat{min-width:118px;max-width:132px;min-height:58px;padding:6px 7px;gap:6px}
+ .felt-table.seats-9 .seat-avatar{width:29px;height:29px;flex-basis:29px}
+ .felt-table.seats-9 .seat-1{left:50%;top:0}
+ .felt-table.seats-9 .seat-2{left:81%;top:13%}
+ .felt-table.seats-9 .seat-3{left:94%;top:35%}
+ .felt-table.seats-9 .seat-4{left:94%;top:65%}
+ .felt-table.seats-9 .seat-5{left:81%;top:87%}
+ .felt-table.seats-9 .seat-6{left:50%;top:100%}
+ .felt-table.seats-9 .seat-7{left:19%;top:87%}
+ .felt-table.seats-9 .seat-8{left:6%;top:65%}
+ .felt-table.seats-9 .seat-9{left:6%;top:35%}
+}
