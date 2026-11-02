@@ -24,7 +24,8 @@ export default function PlayerProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState(null);\n  const [tournamentStats, setTournamentStats] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [tournamentStats, setTournamentStats] = useState(null);
   const [hands, setHands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,8 @@ export default function PlayerProfilePage() {
       supabase.rpc("get_player_public_profile", { p_player_id: id })
     ]);
     setUser(auth.user || null);
+    const { data: tournamentData, error: tournamentError } = await supabase.rpc("get_player_tournament_stats", { p_player_id: id });
+    setTournamentStats(tournamentError ? null : (tournamentData || {}));
     if (error) setMessage(error.message);
     else {
       setProfile(data.profile);
