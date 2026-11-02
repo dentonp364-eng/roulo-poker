@@ -60,6 +60,20 @@ export default function AdminTournamentDashboard() {
     else {setMessage(kind==="start"?"Tournament started successfully.":"Blind level synchronised.");await load();}
   }
 
+  async function deleteTournament(event){
+    if(busy)return;
+    const confirmed=window.confirm(
+      "DELETE TOURNAMENT: "+event.name+"?\n\nThis permanently removes the tournament, its entries, tables and associated hand state. Its tournament results and rankings will also be removed. This cannot be undone."
+    );
+    if(!confirmed)return;
+    setBusy(event.id+"delete");setMessage("");
+    const {data,error}=await supabase.rpc("admin_delete_poker_tournament",{p_tournament_id:event.id});
+    setBusy("");
+    if(error){setMessage(error.message);return;}
+    setMessage("Tournament deleted: "+(data?.tournament_name||event.name));
+    await load();
+  }
+
   const metrics=useMemo(()=>{
     const tables=events.flatMap(e=>(e.tables||[]));
     return {
@@ -100,6 +114,7 @@ export default function AdminTournamentDashboard() {
           <div className="tournament-admin-actions">
             {event.status==="registration"&&<button className="admin-secondary" disabled={!!busy||Number(event.players)<2} onClick={()=>action(event.id,"start")}>{busy===event.id+"start"?"Starting…":"Start tournament"}</button>}
             {event.status==="running"&&<button className="admin-secondary" disabled={!!busy} onClick={()=>action(event.id,"sync")}>{busy===event.id+"sync"?"Updating…":"Sync blind level"}</button>}
+            <button className="admin-danger" disabled={!!busy} onClick={()=>deleteTournament(event)}>{busy===event.id+"delete"?"Deleting…":"Delete tournament"}</button>
             <span>Created {event.created_at?new Date(event.created_at).toLocaleString([],{dateStyle:"medium",timeStyle:"short"}):"—"}</span>
           </div>
           {event.leaderboard?.length>0&&<div className="tournament-admin-players"><div className="admin-kicker">CURRENT PLAYER STANDINGS</div><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>PLAYER</th><th>TABLE</th><th>CHIPS / RESULT</th><th>STATUS</th></tr></thead><tbody>{event.leaderboard.map((player,index)=><tr key={player.player_id}><td><a className="admin-player-link" href={"/profile/"+player.player_id}>{player.display_name||"Poker player"}</a></td><td>{player.table_number||"—"}</td><td>{player.eliminated_at?"Finished #"+(player.finish_position||"—"):Number(player.chips||0).toLocaleString()}</td><td>{player.eliminated_at?"Eliminated":"Active"}</td></tr>)}</tbody></table></div></div>}
@@ -108,7 +123,7 @@ export default function AdminTournamentDashboard() {
     <section className="admin-panel tournament-admin-panel">
       <div className="admin-section-head"><div><span className="admin-kicker">EVENT ARCHIVE</span><h2>Recently completed tournaments</h2><p>Final results recorded by the tournament system.</p></div><a className="admin-secondary" href="/tournament-history">Open history page</a></div>
       {completed.length===0?<div className="profile-empty">No completed tournament records yet.</div>:
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>TOURNAMENT</th><th>COMPLETED</th><th>PLAYERS</th><th>WINNER</th><th>RESULTS</th></tr></thead><tbody>{completed.slice(0,15).map(event=><tr key={event.id}><td><strong>{event.name}</strong></td><td>{event.completed_at?new Date(event.completed_at).toLocaleString(): "—"}</td><td>{event.players}</td><td>{event.leaderboard?.find(p=>p.finish_position===1)?.display_name||"—"}</td><td><a className="admin-player-link" href="/tournament-history">View history</a></td></tr>)}</tbody></table></div>}
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>TOURNAMENT</th><th>COMPLETED</th><th>PLAYERS</th><th>WINNER</th><th>RESULTS</th></tr></thead><tbody>{completed.slice(0,15).map(event=><tr key={event.id}><td><strong>{event.name}</strong></td><td>{event.completed_at?new Date(event.completed_at).toLocaleString(): "—"}</td><td>{event.players}</td><td>{event.leaderboard?.find(p=>p.finish_position===1)?.display_name||"—"}</td><td><a className="admin-player-link" href="/tournament-history">View history</a> <button className="admin-danger admin-danger-compact" disabled={!!busy} onClick={()=>deleteTournament(event)}>{busy===event.id+"delete"?"Deleting…":"Delete"}</button></td></tr>)}</tbody></table></div>}
     </section>
     <p className="admin-footnote">Tournament controls do not manage prizes or payouts. Those remain entirely with the casino.</p>
   </main>;
