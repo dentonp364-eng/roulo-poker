@@ -687,3 +687,30 @@ $$;
 
 revoke all on function public.create_poker_tournament_final_table(uuid) from public;
 grant execute on function public.create_poker_tournament_final_table(uuid) to authenticated;
+
+-- Completed tournament archive for the lobby results section.
+create or replace function public.list_poker_tournament_results()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',t.id,'name',t.name,'started_at',t.started_at,'completed_at',t.completed_at,
+    'players',(select count(*) from public.poker_tournament_entries e where e.tournament_id=t.id),
+    'leaderboard',(select coalesce(jsonb_agg(jsonb_build_object(
+      'player_id',e.player_id,
+      'display_name',coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker Player'),
+      'finish_position',e.finish_position
+    ) order by e.finish_position asc nulls last,coalesce(p.discord_name,u.raw_user_meta_data->>'name','Poker Player')),'[]'::jsonb)
+    from public.poker_tournament_entries e
+    left join public.player_profiles p on p.id=e.player_id
+    left join auth.users u on u.id=e.player_id
+    where e.tournament_id=t.id)
+  ) order by t.completed_at desc nulls last),'[]'::jsonb)
+  from public.poker_tournaments t
+  where t.status='completed';
+$;
+revoke all on function public.list_poker_tournament_results() from public;
+grant execute on function public.list_poker_tournament_results() to authenticated;
