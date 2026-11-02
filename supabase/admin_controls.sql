@@ -92,7 +92,7 @@ declare v_result jsonb;
 begin
   if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
-    'id',u.id,'email',u.email,
+    'id',u.id,'email',u.email,'is_anonymous',coalesce(u.is_anonymous,false),
     'display_name',coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker player'),
     'is_admin',exists(select 1 from public.poker_admins a where a.user_id=u.id)
   ) order by lower(coalesce(u.email,''))),'[]'::jsonb)
@@ -135,3 +135,73 @@ revoke all on function public.admin_revoke_role(uuid) from public;
 grant execute on function public.admin_list_users() to authenticated;
 grant execute on function public.admin_assign_role_by_email(text) to authenticated;
 grant execute on function public.admin_revoke_role(uuid) to authenticated;
+
+
+-- Remove only Roulo's temporary anonymous test accounts; never real Discord accounts.
+create or replace function public.admin_delete_test_player(p_user_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_deleted uuid;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+
+  -- Verify this is an anonymous account created by the temporary test-player feature.
+  if not exists (
+    select 1 from auth.users u
+    where u.id=p_user_id
+      and coalesce(u.is_anonymous,false)=true
+      and coalesce(u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','')='Roulo Test Player'
+  ) then
+    raise exception 'This account is not a recognized Roulo temporary test player';
+  end if;
+
+  -- Remove completed hands involving this test account so its test results no longer affect anyone's totals.
+  delete from public.poker_hand_history h
+  where exists (
+    select 1 from public.poker_hand_history_players hp
+    where hp.hand_history_id=h.id and hp.user_id=p_user_id
+  );
+
+  -- Remove any remaining seats and tournament registrations before deleting the auth account.
+  delete from public.poker_seats where player_id=p_user_id;
+  delete from public.poker_tournament_entries where player_id=p_user_id;
+  delete from auth.users where id=p_user_id returning id into v_deleted;
+
+  if v_deleted is null then raise exception 'Test player was not found'; end if;
+  return jsonb_build_object('deleted',true,'user_id',v_deleted);
+end;
+$$;
+
+create or replace function public.admin_reset_test_stats()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_hands integer;
+begin
+  if not public.is_poker_admin() then raise exception 'Admin access required'; end if;
+
+  -- Delete whole hands that involved a Roulo temporary anonymous test account.
+  delete from public.poker_hand_history h
+  where exists (
+    select 1
+    from public.poker_hand_history_players hp
+    join auth.users u on u.id=hp.user_id
+    where hp.hand_history_id=h.id
+      and coalesce(u.is_anonymous,false)=true
+      and coalesce(u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','')='Roulo Test Player'
+  );
+  get diagnostics v_hands = row_count;
+
+  return jsonb_build_object('deleted_test_hands',v_hands);
+end;
+$$;
+
+revoke all on function public.admin_delete_test_player(uuid) from public;
+revoke all on function public.admin_reset_test_stats() from public;
+grant execute on function public.admin_delete_test_player(uuid) to authenticated;
+grant execute on function public.admin_reset_test_stats() to authenticated;
