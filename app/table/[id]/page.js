@@ -223,7 +223,7 @@ export default function PokerTablePage() {
     {!testPlayerMode && isAdmin && <div className="table-connection-bar"><span>ADMIN TESTING</span><button onClick={()=>window.open("/table/"+tableId+"?testPlayer=1","_blank","noopener,noreferrer")}>＋ ADD TEMPORARY TEST PLAYER</button></div>}
     <div className="table-connection-bar"><span className={connection === "LIVE" ? "connection-dot live" : "connection-dot"} />{connection === "LIVE" ? "LIVE SYNC" : connection === "RECONNECTING" ? "RECONNECTING…" : "CONNECTING…"}<button onClick={load} disabled={loading || acting || starting}>REFRESH TABLE</button>{lastSynced && <small>Synced {lastSynced.toLocaleTimeString()}</small>}</div>
     <section className="table-stage">
-      <div className="felt-table">
+      <div className={`felt-table seats-${table.max_players}`}>
         <div className="felt-watermark">ROULO <b>POKER</b></div>
         <div className="table-center">
           <div className="table-kicker">{phase === "waiting" ? "TABLE READY" : `HAND ${hand?.hand_number || ""} · ${phase.toUpperCase()}`}</div>
