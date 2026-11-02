@@ -248,3 +248,94 @@ $$;
 
 revoke all on function public.admin_register_tournament_test_player(uuid,uuid) from public;
 grant execute on function public.admin_register_tournament_test_player(uuid,uuid) to authenticated;
+
+-- Tournament elimination tracking. A player is eliminated only after a hand
+-- has fully settled and their remaining chip stack is zero.
+alter table public.poker_tournament_entries
+  add column if not exists eliminated_at timestamptz,
+  add column if not exists finish_position integer;
+
+alter table public.poker_tournaments
+  add column if not exists completed_at timestamptz;
+
+create or replace function public.record_poker_tournament_eliminations()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tournament_id uuid;
+  v_remaining integer;
+  v_finish_position integer;
+  v_winner uuid;
+begin
+  if new.phase <> 'showdown' or old.phase = 'showdown' then
+    return new;
+  end if;
+
+  select pt.tournament_id into v_tournament_id
+  from public.poker_tournament_tables pt
+  join public.poker_tournaments t on t.id=pt.tournament_id
+  where pt.table_id=new.table_id and t.status='running'
+  limit 1;
+
+  if v_tournament_id is null then
+    return new;
+  end if;
+
+  -- The hand engine has already awarded the pot before it changes the phase
+  -- to showdown, so zero stacks here are genuine tournament eliminations.
+  select count(*) into v_remaining
+  from public.poker_tournament_entries e
+  join public.poker_seats s on s.table_id=e.table_id and s.player_id=e.player_id
+  where e.tournament_id=v_tournament_id
+    and e.eliminated_at is null
+    and s.chips > 0;
+
+  v_finish_position := v_remaining + 1;
+
+  update public.poker_tournament_entries e
+  set eliminated_at=now(),finish_position=v_finish_position
+  from public.poker_seats s
+  where e.tournament_id=v_tournament_id
+    and e.table_id=new.table_id
+    and e.player_id=s.player_id
+    and s.table_id=new.table_id
+    and s.chips <= 0
+    and e.eliminated_at is null;
+
+  -- If one player remains, close the event and mark the champion first.
+  select e.player_id into v_winner
+  from public.poker_tournament_entries e
+  join public.poker_seats s on s.table_id=e.table_id and s.player_id=e.player_id
+  where e.tournament_id=v_tournament_id
+    and e.eliminated_at is null
+    and s.chips > 0
+  limit 1;
+
+  select count(*) into v_remaining
+  from public.poker_tournament_entries e
+  where e.tournament_id=v_tournament_id and e.eliminated_at is null;
+
+  if v_remaining = 1 and v_winner is not null then
+    update public.poker_tournament_entries
+    set finish_position=1
+    where tournament_id=v_tournament_id and player_id=v_winner;
+    update public.poker_tournaments
+    set status='completed',completed_at=now()
+    where id=v_tournament_id and status='running';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists poker_tournament_elimination_after_hand on public.poker_hand_state;
+create trigger poker_tournament_elimination_after_hand
+after update of phase on public.poker_hand_state
+for each row
+when (new.phase='showdown' and old.phase is distinct from new.phase)
+execute function public.record_poker_tournament_eliminations();
+
+revoke all on function public.record_poker_tournament_eliminations() from public;
