@@ -9,7 +9,7 @@ const SUITS = { c: "♣", d: "♦", h: "♥", s: "♠" };
 const RED_SUITS = new Set(["d", "h"]);
 
 function PlayingCard({ card, faceDown = false }) {
-  if (faceDown || !card) return <div className="playing-card-back" aria-label="Face-down card"><img src="/roulo-logo.svg" alt="" /></div>;
+  if (faceDown || !card) return <div className="playing-card-back" aria-label="Face-down card"><img src="/roulo-logo.png" alt="" /></div>;
   const rank = card.slice(0, -1);
   const suit = card.slice(-1);
   return <div className={`playing-card-face ${RED_SUITS.has(suit) ? "red-card" : ""}`}>
