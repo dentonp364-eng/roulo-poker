@@ -538,21 +538,6 @@ begin
     update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now()
     where table_id=p_table_id;
     return jsonb_build_object('phase','showdown','board',v_board,'all_in_runout',true)||v_settlement;
-  elsif v_can_act=1 and v_active>1 then
-    -- No further betting is possible when every opponent is all-in: run the board automatically.
-    select cards into v_deck from public.poker_private_decks
-    where table_id=p_table_id and hand_number=v_state.hand_number;
-    v_board:=v_state.board;
-    while jsonb_array_length(v_board)<5 loop
-      v_n:=jsonb_array_length(v_board)+1;
-      v_board:=v_board||jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-v_n));
-    end loop;
-    v_settlement:=public.poker_settle_side_pots(
-      p_table_id,v_state.hand_number,v_board,v_folded,v_total_contrib
-    );
-    update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now()
-    where table_id=p_table_id;
-    return jsonb_build_object('phase','showdown','board',v_board,'all_in_runout',true)||v_settlement;
   end if;
 
   select count(*) into v_pending from public.poker_seats s
@@ -563,6 +548,24 @@ begin
       or coalesce((v_contrib->>s.seat_number::text)::bigint,0) < v_state.current_bet
     );
   if v_pending=0 then
+    -- If only one player still has chips, first let them respond to any outstanding
+    -- wager. Once action is complete, run the remaining board without further betting.
+    if v_can_act=1 and v_active>1 then
+      select cards into v_deck from public.poker_private_decks
+      where table_id=p_table_id and hand_number=v_state.hand_number;
+      v_board:=v_state.board;
+      while jsonb_array_length(v_board)<5 loop
+        v_n:=jsonb_array_length(v_board)+1;
+        v_board:=v_board||jsonb_build_array(v_deck->(jsonb_array_length(v_deck)-v_n));
+      end loop;
+      v_settlement:=public.poker_settle_side_pots(
+        p_table_id,v_state.hand_number,v_board,v_folded,v_total_contrib
+      );
+      update public.poker_hand_state set phase='showdown',board=v_board,acting_seat=null,updated_at=now()
+      where table_id=p_table_id;
+      return jsonb_build_object('phase','showdown','board',v_board,'all_in_runout',true)||v_settlement;
+    end if;
+
     -- All live players have acted and matched the current wager: deal next street.
     select cards into v_deck from public.poker_private_decks where table_id=p_table_id and hand_number=v_state.hand_number;
     v_board:=v_state.board;
@@ -594,10 +597,12 @@ begin
       contributions='{}'::jsonb,acted_seats='[]'::jsonb,updated_at=now() where table_id=p_table_id;
   end if;
 
+  -- On a newly dealt street, action restarts left of the dealer. During
+  -- the same street, action advances clockwise from the player who just acted.
   select min(s.seat_number) into v_next from public.poker_seats s
   where s.table_id=p_table_id and s.chips>0
     and not (v_folded @> jsonb_build_array(s.seat_number))
-    and s.seat_number>v_seat.seat_number;
+    and s.seat_number > case when v_pending=0 then v_state.dealer_seat else v_seat.seat_number end;
   if v_next is null then
     select min(s.seat_number) into v_next from public.poker_seats s
     where s.table_id=p_table_id and s.chips>0
