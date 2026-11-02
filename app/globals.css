@@ -344,6 +344,6 @@ a { color: inherit; text-decoration: none; }
 
 /* Restore the compact full Roulo wordmark in the lobby chip and card backs. */
 .feature-chip { overflow: hidden; }
-.feature-chip img { position: static; display: block; width: 62px; height: 21px; max-width: 100%; padding: 0; object-fit: contain; object-position: center; transform: none; }
+.feature-chip img { position: static; display: block; width: 50px; height: 17px; max-width: 100%; padding: 0; object-fit: contain; object-position: center; transform: none; }
 .playing-card-back { display: grid; place-items: center; overflow: hidden; }
-.playing-card-back img { position: static; display: block; width: 44px; height: 18px; max-width: 100%; padding: 0; object-fit: contain; object-position: center; transform: none; opacity: 1; }
+.playing-card-back img { position: static; display: block; width: 28px; height: 10px; max-width: 100%; padding: 0; object-fit: contain; object-position: center; transform: none; opacity: 1; }
