@@ -714,3 +714,73 @@ as $$
 $$;
 revoke all on function public.list_poker_tournament_results() from public;
 grant execute on function public.list_poker_tournament_results() to authenticated;
+
+
+-- Tournament performance points: 100 for 1st, 75 for 2nd, 60 for 3rd,
+-- 45 for 4th, 35 for 5th, 25 for 6th, 15 for 7th, 10 for 8th+.
+create or replace function public.list_poker_tournament_rankings()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with player_results as (
+    select e.player_id,
+      coalesce(nullif(p.discord_name,''),u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','Poker Player') as display_name,
+      p.avatar_url,
+      count(*)::integer as tournaments_entered,
+      count(*) filter (where t.status='completed')::integer as tournaments_completed,
+      count(*) filter (where e.finish_position=1)::integer as wins,
+      count(*) filter (where e.finish_position between 1 and 3)::integer as top_three,
+      min(e.finish_position) as best_finish,
+      coalesce(sum(case e.finish_position
+        when 1 then 100 when 2 then 75 when 3 then 60 when 4 then 45
+        when 5 then 35 when 6 then 25 when 7 then 15
+        when 8 then 10 else 0 end),0)::integer as points
+    from public.poker_tournament_entries e
+    join public.poker_tournaments t on t.id=e.tournament_id
+    left join public.player_profiles p on p.id=e.player_id
+    left join auth.users u on u.id=e.player_id
+    group by e.player_id,p.discord_name,p.avatar_url,u.raw_user_meta_data
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'player_id',ranked.player_id,'display_name',ranked.display_name,'avatar_url',ranked.avatar_url,
+    'tournaments_entered',ranked.tournaments_entered,'tournaments_completed',ranked.tournaments_completed,
+    'wins',ranked.wins,'top_three',ranked.top_three,'best_finish',ranked.best_finish,
+    'points',ranked.points,'rank',ranked.rank
+  ) order by ranked.rank),'[]'::jsonb)
+  from (
+    select player_results.*,
+      row_number() over(order by points desc,wins desc,top_three desc,best_finish asc nulls last,display_name asc) as rank
+    from player_results
+  ) ranked;
+$$;
+
+create or replace function public.get_player_tournament_stats(p_player_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'tournaments_entered',count(*),
+    'tournaments_completed',count(*) filter(where t.status='completed'),
+    'wins',count(*) filter(where e.finish_position=1),
+    'top_three',count(*) filter(where e.finish_position between 1 and 3),
+    'best_finish',min(e.finish_position),
+    'points',coalesce(sum(case e.finish_position
+      when 1 then 100 when 2 then 75 when 3 then 60 when 4 then 45
+      when 5 then 35 when 6 then 25 when 7 then 15
+      when 8 then 10 else 0 end),0)
+  )
+  from public.poker_tournament_entries e
+  join public.poker_tournaments t on t.id=e.tournament_id
+  where e.player_id=p_player_id;
+$$;
+
+revoke all on function public.list_poker_tournament_rankings() from public;
+revoke all on function public.get_player_tournament_stats(uuid) from public;
+grant execute on function public.list_poker_tournament_rankings() to authenticated;
+grant execute on function public.get_player_tournament_stats(uuid) to authenticated;
