@@ -602,11 +602,19 @@ begin
   select min(s.seat_number) into v_next from public.poker_seats s
   where s.table_id=p_table_id and s.chips>0
     and not (v_folded @> jsonb_build_array(s.seat_number))
+    and (
+      not (v_acted @> jsonb_build_array(s.seat_number))
+      or coalesce((v_contrib->>s.seat_number::text)::bigint,0) < v_state.current_bet
+    )
     and s.seat_number > case when v_pending=0 then v_state.dealer_seat else v_seat.seat_number end;
   if v_next is null then
     select min(s.seat_number) into v_next from public.poker_seats s
     where s.table_id=p_table_id and s.chips>0
-      and not (v_folded @> jsonb_build_array(s.seat_number));
+      and not (v_folded @> jsonb_build_array(s.seat_number))
+      and (
+        not (v_acted @> jsonb_build_array(s.seat_number))
+        or coalesce((v_contrib->>s.seat_number::text)::bigint,0) < v_state.current_bet
+      );
   end if;
   update public.poker_hand_state set acting_seat=v_next,contributions=v_contrib,total_contributions=v_total_contrib,
     folded_seats=v_folded,acted_seats=v_acted,updated_at=now() where table_id=p_table_id;
