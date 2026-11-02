@@ -99,6 +99,7 @@ as $$
     'blind_interval_minutes',t.blind_interval_minutes,'status',t.status,
     'started_at',t.started_at,'blind_level',t.blind_level,'created_at',t.created_at,
     'players',(select count(*) from public.poker_tournament_entries e where e.tournament_id=t.id),
+    'my_table_id',(select e.table_id from public.poker_tournament_entries e where e.tournament_id=t.id and e.player_id=auth.uid()),
     'capacity',t.table_count*t.players_per_table,
     'tables',(select coalesce(jsonb_agg(jsonb_build_object(
       'table_id',pt.table_id,'table_number',pt.table_number,
@@ -116,3 +117,60 @@ revoke all on function public.list_poker_tournaments() from public;
 grant execute on function public.start_poker_tournament(uuid) to authenticated;
 grant execute on function public.advance_poker_tournament_blinds(uuid) to authenticated;
 grant execute on function public.list_poker_tournaments() to authenticated;
+
+
+-- Let an already-registered player reopen their assigned table after registration closes.
+create or replace function public.register_poker_tournament(p_tournament_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_t public.poker_tournaments%rowtype;
+  v_table_id uuid;
+  v_seat integer;
+  v_existing public.poker_tournament_entries%rowtype;
+begin
+  if v_user is null then raise exception 'Sign in first'; end if;
+  select * into v_t from public.poker_tournaments where id=p_tournament_id for update;
+  if not found then raise exception 'Tournament not found'; end if;
+
+  select * into v_existing from public.poker_tournament_entries
+  where tournament_id=p_tournament_id and player_id=v_user;
+  if found then
+    return jsonb_build_object('registered',true,'table_id',v_existing.table_id,'seat_number',v_existing.seat_number);
+  end if;
+
+  if v_t.status <> 'registration' then raise exception 'Tournament registration is closed'; end if;
+  if (select count(*) from public.poker_tournament_entries where tournament_id=p_tournament_id) >= v_t.table_count*v_t.players_per_table then
+    raise exception 'This tournament is full';
+  end if;
+
+  insert into public.player_profiles(id,discord_name,chips)
+  values(v_user,'Poker Player',v_t.starting_chips)
+  on conflict(id) do nothing;
+
+  select pt.table_id into v_table_id
+  from public.poker_tournament_tables pt
+  where pt.tournament_id=p_tournament_id
+  order by (select count(*) from public.poker_seats s where s.table_id=pt.table_id),pt.table_number
+  limit 1
+  for update;
+
+  select min(n) into v_seat
+  from generate_series(1,v_t.players_per_table) n
+  where not exists(select 1 from public.poker_seats s where s.table_id=v_table_id and s.seat_number=n);
+  if v_seat is null then raise exception 'No available tournament seat was found'; end if;
+
+  insert into public.poker_seats(table_id,player_id,seat_number,chips)
+  values(v_table_id,v_user,v_seat,v_t.starting_chips);
+  insert into public.poker_tournament_entries(tournament_id,player_id,table_id,seat_number)
+  values(p_tournament_id,v_user,v_table_id,v_seat);
+
+  return jsonb_build_object('registered',true,'table_id',v_table_id,'seat_number',v_seat);
+end;
+$$;
+revoke all on function public.register_poker_tournament(uuid) from public;
+grant execute on function public.register_poker_tournament(uuid) to authenticated;
