@@ -29,6 +29,19 @@ export default function TournamentsPage() {
     return ()=>{alive=false;};
   },[load]);
 
+  useEffect(()=>{
+    if(!user)return;
+    const syncRunning=async()=>{
+      const running=items.filter(t=>t.status==="running" && t.my_table_id);
+      if(!running.length)return;
+      await Promise.all(running.map(t=>supabase.rpc("advance_poker_tournament_blinds",{p_tournament_id:t.id})));
+      await load();
+    };
+    syncRunning();
+    const timer=window.setInterval(syncRunning,30000);
+    return ()=>window.clearInterval(timer);
+  },[items,user,load]);
+
   async function createTournament(e){
     e.preventDefault();
     if(!user||busy)return;
@@ -41,6 +54,16 @@ export default function TournamentsPage() {
     setBusy(false);
     if(error){setMessage(error.message);return;}
     setMessage(`Tournament created with ${data.table_count} tables and capacity for ${data.capacity} players. Register below to take your seat.`);
+    await load();
+  }
+
+  async function startTournament(tournament){
+    if(!user||busy)return;
+    setBusy(true);setMessage("");
+    const {error}=await supabase.rpc("start_poker_tournament",{p_tournament_id:tournament.id});
+    setBusy(false);
+    if(error){setMessage(error.message);return;}
+    setMessage("Tournament started. Registration is now closed and the blind clock is running.");
     await load();
   }
 
@@ -91,9 +114,10 @@ export default function TournamentsPage() {
         {items.length===0?<div className="empty-state"><div className="empty-symbol">♠</div><strong>No tournaments open yet</strong><p>Create the first event and invite your players.</p></div>:
           <div className="tournament-cards">{items.map(t=><article className="tournament-card" key={t.id}>
             <div className="tournament-card-head"><div><span className="eyebrow">{t.status==="registration"?"REGISTRATION OPEN":"IN PROGRESS"}</span><h3>{t.name}</h3></div><span className="tournament-status">{t.status==="registration"?"OPEN":"LIVE"}</span></div>
-            <div className="tournament-stats"><div><strong>{t.players}/{t.capacity}</strong><span>PLAYERS</span></div><div><strong>{t.table_count}</strong><span>TABLES</span></div><div><strong>{Number(t.starting_chips).toLocaleString()}</strong><span>STARTING CHIPS</span></div><div><strong>{t.small_blind}/{t.big_blind}</strong><span>BLINDS</span></div></div>
+            <div className="tournament-stats"><div><strong>{t.players}/{t.capacity}</strong><span>PLAYERS</span></div><div><strong>{t.table_count}</strong><span>TABLES</span></div><div><strong>{Number(t.starting_chips).toLocaleString()}</strong><span>STARTING CHIPS</span></div><div><strong>{t.status==="running"?Number(t.small_blind*Math.pow(2,Math.max(0,(t.blind_level||1)-1))).toLocaleString()+"/"+Number(t.big_blind*Math.pow(2,Math.max(0,(t.blind_level||1)-1))).toLocaleString():t.small_blind+"/"+t.big_blind}</strong><span>{t.status==="running"?"LEVEL "+(t.blind_level||1):"STARTING BLINDS"}</span></div></div>
             <div className="tournament-table-list">{(t.tables||[]).map(tb=><span key={tb.table_id}>TABLE {tb.table_number} · {tb.seated}/{tb.max_players}</span>)}</div>
-            <button className="button button-primary tournament-join" disabled={busy||t.status!=="registration"||t.players>=t.capacity} onClick={()=>register(t)}>{t.players>=t.capacity?"Tournament full":t.status!=="registration"?"Tournament in progress":"REGISTER FOR TOURNAMENT"} →</button>
+            {t.status==="registration"&&user?.id===t.owner_id&&<button className="button button-quiet tournament-join" disabled={busy||t.players<2} onClick={()=>startTournament(t)}>{busy?"Starting…":"START TOURNAMENT"} →</button>}
+            <button className="button button-primary tournament-join" disabled={busy||(!t.my_table_id&&(t.status!=="registration"||t.players>=t.capacity))} onClick={()=>register(t)}>{t.my_table_id?"OPEN MY TABLE":t.players>=t.capacity?"Tournament full":t.status!=="registration"?"Registration closed":"REGISTER FOR TOURNAMENT"} →</button>
           </article>)}</div>}
       </div>
     </section>
