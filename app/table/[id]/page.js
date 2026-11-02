@@ -31,6 +31,7 @@ export default function PokerTablePage() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [acting, setActing] = useState(false);
+  const [raiseAmount, setRaiseAmount] = useState("20");
   const [connection, setConnection] = useState("CONNECTING");
   const [lastSynced, setLastSynced] = useState(null);
   const [testPlayerMode, setTestPlayerMode] = useState(false);
@@ -204,8 +205,11 @@ export default function PokerTablePage() {
   const toCall = Math.max(0, Number(hand?.current_bet || 0) - myContribution);
   const minimumRaiseTo = Number(hand?.current_bet || 0) + Math.max(Number(hand?.last_raise_size || 0), Number(table.big_blind));
   const maximumRaiseTo = myContribution + Number(mySeat?.chips || 0);
-  const raiseTo = Math.min(minimumRaiseTo, maximumRaiseTo);
-  const isShortAllIn = raiseTo > Number(hand?.current_bet || 0) && raiseTo < minimumRaiseTo;
+  const requestedRaiseTo = Number(raiseAmount);
+  const raiseTo = Number.isFinite(requestedRaiseTo) ? requestedRaiseTo : 0;
+  const isShortAllIn = raiseTo === maximumRaiseTo && raiseTo > Number(hand?.current_bet || 0) && raiseTo < minimumRaiseTo;
+  const minimumWager = Number(hand?.current_bet || 0) === 0 ? Number(table.big_blind) : minimumRaiseTo;
+  const validWager = raiseTo > Number(hand?.current_bet || 0) && raiseTo <= maximumRaiseTo && (raiseTo >= minimumWager || isShortAllIn);
   const canStart = isSeated && players.filter(p => Number(p.chips) > 0).length >= 2 && (!hand || phase === "waiting" || phase === "showdown");
 
   return <main className="poker-shell">
@@ -241,8 +245,10 @@ export default function PokerTablePage() {
       </div>
       <div className="action-panel">
         <button disabled={!myTurn || acting} onClick={() => takeAction("fold")}>FOLD</button>
-        <button className="action-primary" disabled={!myTurn || acting} onClick={() => takeAction(toCall > 0 ? "call" : "check")}>{toCall > 0 ? `CALL ${toCall.toLocaleString()}` : "CHECK"}</button>
-        <button disabled={!myTurn || acting || raiseTo <= Number(hand?.current_bet || 0)} onClick={() => takeAction(hand?.current_bet > 0 ? "raise" : "bet", raiseTo)}>{isShortAllIn ? "ALL-IN" : hand?.current_bet > 0 ? "RAISE TO" : "BET"} {raiseTo.toLocaleString()}</button>
+        <button className="action-primary" disabled={!myTurn || acting || toCall > 0} onClick={() => takeAction("check")}>CHECK</button>
+        <button disabled={!myTurn || acting || toCall <= 0 || Number(mySeat?.chips || 0) <= 0} onClick={() => takeAction("call")}>{toCall > Number(mySeat?.chips || 0) ? "CALL ALL-IN" : `CALL ${toCall.toLocaleString()}`}</button>
+        <label className="raise-entry"><span>{Number(hand?.current_bet || 0) > 0 ? "RAISE TO" : "BET AMOUNT"}</span><input type="number" min={minimumWager} max={maximumRaiseTo} step="1" value={raiseAmount} onChange={e=>setRaiseAmount(e.target.value)} disabled={!myTurn || acting} /></label>
+        <button className="action-primary" disabled={!myTurn || acting || !validWager} onClick={() => takeAction(Number(hand?.current_bet || 0) > 0 ? "raise" : "bet", raiseTo)}>{isShortAllIn ? "ALL-IN" : Number(hand?.current_bet || 0) > 0 ? "RAISE" : "BET"} {raiseTo.toLocaleString()}</button>
       </div>
     </section>
     <p className="prototype-note">{isSeated ? `Your seat: ${mySeat?.seat_number} · ` : "Join this table from the lobby to play · "}{myTurn ? "It's your turn · " : ""}Cards are dealt privately to each player · Virtual chips only</p>
