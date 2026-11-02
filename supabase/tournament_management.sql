@@ -501,3 +501,10 @@ execute function public.trigger_balance_poker_tournament_tables();
 
 revoke all on function public.balance_poker_tournament_tables(uuid) from public;
 revoke all on function public.trigger_balance_poker_tournament_tables() from public;
+-- Eliminated entries remain in the results, but must not reserve a seat.
+alter table public.poker_tournament_entries
+  drop constraint if exists poker_tournament_entries_table_id_seat_number_key;
+
+create unique index if not exists poker_tournament_entries_active_table_seat_key
+  on public.poker_tournament_entries(table_id,seat_number)
+  where eliminated_at is null;
